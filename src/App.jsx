@@ -21,55 +21,84 @@ function usePersisted(key, initial) {
 // ===================== INITIAL DATA =====================
 const initialInsumos = [
   // Carnes
-  { id: 1, nombre: "Carne picada", unidad: "kg", precio_unidad: 4000, categoria: "Carnes" },
-  { id: 4, nombre: "Bacon", unidad: "kg", precio_unidad: 5500, categoria: "Carnes" },
-  { id: 30, nombre: "Panceta", unidad: "kg", precio_unidad: 5000, categoria: "Carnes" },
+  { id: 1,  nombre: "Carne picada",         unidad: "kg",     precio_unidad: 15100,    categoria: "Carnes" },
+  { id: 30, nombre: "Panceta",               unidad: "kg",     precio_unidad: 19154.29, categoria: "Carnes" },
+  { id: 4,  nombre: "Bacon",                 unidad: "kg",     precio_unidad: 19154.29, categoria: "Carnes" },
+  { id: 44, nombre: "Veggies",               unidad: "kg",     precio_unidad: 1169.55,  categoria: "Carnes" },
+  { id: 45, nombre: "Medallon pollo",        unidad: "kg",     precio_unidad: 7000,     categoria: "Carnes" },
   // Panificados
-  { id: 2, nombre: "Pan brioche", unidad: "unidad", precio_unidad: 250, categoria: "Panificados" },
+  { id: 2,  nombre: "Pan brioche",           unidad: "unidad", precio_unidad: 475,      categoria: "Panificados" },
+  { id: 46, nombre: "Harina 0000",           unidad: "kg",     precio_unidad: 1105.64,  categoria: "Panificados" },
   // Lacteos
-  { id: 3, nombre: "Queso cheddar", unidad: "kg", precio_unidad: 3200, categoria: "Lácteos" },
-  { id: 38, nombre: "Queso roquefort", unidad: "kg", precio_unidad: 5000, categoria: "Lácteos" },
-  { id: 20, nombre: "Leche", unidad: "kg", precio_unidad: 600, categoria: "Lácteos" },
-  { id: 21, nombre: "Crema de leche", unidad: "kg", precio_unidad: 1800, categoria: "Lácteos" },
-  { id: 22, nombre: "Manteca", unidad: "kg", precio_unidad: 4000, categoria: "Lácteos" },
-  { id: 23, nombre: "Casan Crem", unidad: "kg", precio_unidad: 2500, categoria: "Lácteos" },
+  { id: 3,  nombre: "Queso cheddar",         unidad: "kg",     precio_unidad: 26137.60, categoria: "Lacteos" },
+  { id: 47, nombre: "Cheddar liquido",       unidad: "kg",     precio_unidad: 31553,    categoria: "Lacteos" },
+  { id: 21, nombre: "Crema de leche",        unidad: "kg",     precio_unidad: 2859.23,  categoria: "Lacteos" },
+  { id: 20, nombre: "Leche",                 unidad: "kg",     precio_unidad: 1809.51,  categoria: "Lacteos" },
+  { id: 38, nombre: "Queso roquefort",       unidad: "kg",     precio_unidad: 12992.67, categoria: "Lacteos" },
+  { id: 23, nombre: "Casan Crem",            unidad: "kg",     precio_unidad: 4751.67,  categoria: "Lacteos" },
+  { id: 22, nombre: "Manteca",               unidad: "kg",     precio_unidad: 12416.54, categoria: "Lacteos" },
   // Verduras
-  { id: 5, nombre: "Lechuga", unidad: "kg", precio_unidad: 800, categoria: "Verduras" },
-  { id: 6, nombre: "Tomate", unidad: "kg", precio_unidad: 900, categoria: "Verduras" },
-  { id: 7, nombre: "Cebolla", unidad: "kg", precio_unidad: 500, categoria: "Verduras" },
-  { id: 39, nombre: "Cebolla morada", unidad: "kg", precio_unidad: 600, categoria: "Verduras" },
-  { id: 40, nombre: "Rucula", unidad: "kg", precio_unidad: 1200, categoria: "Verduras" },
-  { id: 12, nombre: "Ajo", unidad: "kg", precio_unidad: 2000, categoria: "Verduras" },
-  { id: 24, nombre: "Ajo picado", unidad: "kg", precio_unidad: 2200, categoria: "Verduras" },
-  { id: 25, nombre: "Perejil", unidad: "kg", precio_unidad: 800, categoria: "Verduras" },
-  { id: 26, nombre: "Ciboulette", unidad: "kg", precio_unidad: 1200, categoria: "Verduras" },
-  { id: 27, nombre: "Cebolla picada", unidad: "kg", precio_unidad: 500, categoria: "Verduras" },
+  { id: 5,  nombre: "Lechuga",               unidad: "kg",     precio_unidad: 3000,     categoria: "Verduras" },
+  { id: 6,  nombre: "Tomate",                unidad: "kg",     precio_unidad: 3000,     categoria: "Verduras" },
+  { id: 48, nombre: "Repollo",               unidad: "kg",     precio_unidad: 8000,     categoria: "Verduras" },
+  { id: 7,  nombre: "Cebolla",               unidad: "kg",     precio_unidad: 18000,    categoria: "Verduras" },
+  { id: 39, nombre: "Cebolla morada",        unidad: "kg",     precio_unidad: 2000,     categoria: "Verduras" },
+  { id: 40, nombre: "Rucula",                unidad: "kg",     precio_unidad: 3000,     categoria: "Verduras" },
+  { id: 12, nombre: "Ajo",                   unidad: "kg",     precio_unidad: 2000,     categoria: "Verduras" },
+  { id: 24, nombre: "Ajo picado",            unidad: "kg",     precio_unidad: 2200,     categoria: "Verduras" },
+  { id: 25, nombre: "Perejil",               unidad: "kg",     precio_unidad: 800,      categoria: "Verduras" },
+  { id: 26, nombre: "Ciboulette",            unidad: "kg",     precio_unidad: 1200,     categoria: "Verduras" },
+  { id: 27, nombre: "Cebolla picada",        unidad: "kg",     precio_unidad: 18000,    categoria: "Verduras" },
+  { id: 8,  nombre: "Pepinillos",            unidad: "kg",     precio_unidad: 19405,    categoria: "Verduras" },
   // Salsas base
-  { id: 9, nombre: "Mayonesa", unidad: "kg", precio_unidad: 1200, categoria: "Salsas base" },
-  { id: 10, nombre: "Ketchup", unidad: "kg", precio_unidad: 900, categoria: "Salsas base" },
-  { id: 11, nombre: "Mostaza", unidad: "kg", precio_unidad: 850, categoria: "Salsas base" },
-  { id: 15, nombre: "Mostaza de Dijon", unidad: "kg", precio_unidad: 2200, categoria: "Salsas base" },
-  { id: 14, nombre: "Barbacoa", unidad: "kg", precio_unidad: 1100, categoria: "Salsas base" },
-  { id: 16, nombre: "Salsa Inglesa", unidad: "kg", precio_unidad: 1800, categoria: "Salsas base" },
-  { id: 17, nombre: "Relish", unidad: "kg", precio_unidad: 2000, categoria: "Salsas base" },
+  { id: 9,  nombre: "Mayonesa",              unidad: "kg",     precio_unidad: 11522.13, categoria: "Salsas base" },
+  { id: 10, nombre: "Ketchup",               unidad: "kg",     precio_unidad: 11761.05, categoria: "Salsas base" },
+  { id: 14, nombre: "Barbacoa",              unidad: "kg",     precio_unidad: 12504.54, categoria: "Salsas base" },
+  { id: 49, nombre: "Savora",                unidad: "kg",     precio_unidad: 8528.06,  categoria: "Salsas base" },
+  { id: 11, nombre: "Mostaza",               unidad: "kg",     precio_unidad: 8528.06,  categoria: "Salsas base" },
+  { id: 15, nombre: "Mostaza de Dijon",      unidad: "kg",     precio_unidad: 8528.06,  categoria: "Salsas base" },
+  { id: 16, nombre: "Salsa Inglesa",         unidad: "kg",     precio_unidad: 1800,     categoria: "Salsas base" },
+  { id: 17, nombre: "Relish",                unidad: "kg",     precio_unidad: 2000,     categoria: "Salsas base" },
+  // Aceites
+  { id: 19, nombre: "Aceite de Girasol",     unidad: "kg",     precio_unidad: 3051.62,  categoria: "Aceites" },
+  { id: 50, nombre: "Aceite de Oliva",       unidad: "kg",     precio_unidad: 4600,     categoria: "Aceites" },
   // Especias
-  { id: 13, nombre: "Pimentón ahumado", unidad: "kg", precio_unidad: 3500, categoria: "Especias" },
-  { id: 18, nombre: "Pimienta", unidad: "kg", precio_unidad: 4000, categoria: "Especias" },
-  { id: 28, nombre: "Aji Molido", unidad: "kg", precio_unidad: 3000, categoria: "Especias" },
-  { id: 29, nombre: "Ajo en polvo", unidad: "kg", precio_unidad: 5000, categoria: "Especias" },
-  { id: 31, nombre: "Polvo sabor carne", unidad: "kg", precio_unidad: 6000, categoria: "Especias" },
-  { id: 32, nombre: "Sal", unidad: "kg", precio_unidad: 300, categoria: "Especias" },
-  // Varios / Acompañamientos
-  { id: 8, nombre: "Pepinillos", unidad: "kg", precio_unidad: 1800, categoria: "Varios" },
-  { id: 19, nombre: "Aceite", unidad: "kg", precio_unidad: 1500, categoria: "Varios" },
-  { id: 33, nombre: "Vinagre", unidad: "kg", precio_unidad: 800, categoria: "Varios" },
-  { id: 34, nombre: "Azucar", unidad: "kg", precio_unidad: 600, categoria: "Varios" },
-  { id: 35, nombre: "Miel", unidad: "kg", precio_unidad: 3500, categoria: "Varios" },
-  { id: 36, nombre: "Humo liquido", unidad: "kg", precio_unidad: 8000, categoria: "Varios" },
-  { id: 37, nombre: "Jugo de limon", unidad: "kg", precio_unidad: 1200, categoria: "Varios" },
-  { id: 41, nombre: "Papas fritas", unidad: "kg", precio_unidad: 1800, categoria: "Varios" },
-  { id: 42, nombre: "Aros de cebolla", unidad: "kg", precio_unidad: 2500, categoria: "Varios" },
-  { id: 43, nombre: "Nuggets", unidad: "kg", precio_unidad: 2200, categoria: "Varios" },
+  { id: 29, nombre: "Ajo en polvo",          unidad: "kg",     precio_unidad: 16437.68, categoria: "Especias" },
+  { id: 13, nombre: "Pimenton ahumado",      unidad: "kg",     precio_unidad: 16325,    categoria: "Especias" },
+  { id: 32, nombre: "Sal",                   unidad: "kg",     precio_unidad: 1796,     categoria: "Especias" },
+  { id: 34, nombre: "Azucar",                unidad: "kg",     precio_unidad: 1384,     categoria: "Especias" },
+  { id: 36, nombre: "Humo liquido",          unidad: "kg",     precio_unidad: 21172,    categoria: "Especias" },
+  { id: 31, nombre: "Polvo sabor carne",     unidad: "kg",     precio_unidad: 3107.28,  categoria: "Especias" },
+  { id: 35, nombre: "Miel",                  unidad: "kg",     precio_unidad: 6424.54,  categoria: "Especias" },
+  { id: 33, nombre: "Vinagre",               unidad: "kg",     precio_unidad: 1007.93,  categoria: "Especias" },
+  { id: 18, nombre: "Pimienta",              unidad: "kg",     precio_unidad: 4000,     categoria: "Especias" },
+  { id: 28, nombre: "Aji Molido",            unidad: "kg",     precio_unidad: 3000,     categoria: "Especias" },
+  { id: 51, nombre: "Minerva",               unidad: "litro",  precio_unidad: 2551.32,  categoria: "Especias" },
+  { id: 37, nombre: "Jugo de limon",         unidad: "kg",     precio_unidad: 1200,     categoria: "Especias" },
+  // Guarniciones
+  { id: 41, nombre: "Papas fritas",          unidad: "kg",     precio_unidad: 68558.05, categoria: "Guarniciones" },
+  { id: 42, nombre: "Aros de cebolla",       unidad: "kg",     precio_unidad: 10653.81, categoria: "Guarniciones" },
+  { id: 43, nombre: "Nuggets",               unidad: "kg",     precio_unidad: 65358,    categoria: "Guarniciones" },
+  // Descartables
+  { id: 52, nombre: "FVG",                   unidad: "unidad", precio_unidad: 4000,     categoria: "Descartables" },
+  { id: 53, nombre: "Gomitas (1 Kilo)",      unidad: "kg",     precio_unidad: 9000,     categoria: "Descartables" },
+  { id: 54, nombre: "Papel Madera",          unidad: "unidad", precio_unidad: 10000,    categoria: "Descartables" },
+  { id: 55, nombre: "Film (38x600)",         unidad: "unidad", precio_unidad: 18000,    categoria: "Descartables" },
+  { id: 56, nombre: "Aluminio",              unidad: "unidad", precio_unidad: 7500,     categoria: "Descartables" },
+  { id: 57, nombre: "Bandejas Papas (x100)", unidad: "unidad", precio_unidad: 3960,     categoria: "Descartables" },
+  { id: 58, nombre: "Papel de Cocina",       unidad: "unidad", precio_unidad: 7700,     categoria: "Descartables" },
+  // Packaging
+  { id: 59, nombre: "Cajas Dely",            unidad: "unidad", precio_unidad: 508.68,   categoria: "Packaging" },
+  { id: 60, nombre: "Bolas Dely",            unidad: "unidad", precio_unidad: 374.37,   categoria: "Packaging" },
+  // Comandera
+  { id: 61, nombre: "Rollos Comandera",      unidad: "unidad", precio_unidad: 1100,     categoria: "Comandera" },
+  { id: 62, nombre: "Rollos Pedidos Ya",     unidad: "unidad", precio_unidad: 560,      categoria: "Comandera" },
+  // Limpieza
+  { id: 63, nombre: "Detergente",            unidad: "unidad", precio_unidad: 13408.71, categoria: "Limpieza" },
+  { id: 64, nombre: "Antigrasa (4 Litros)",  unidad: "unidad", precio_unidad: 15003.88, categoria: "Limpieza" },
+  { id: 65, nombre: "Alcohol (5 Litros)",    unidad: "unidad", precio_unidad: 16791,    categoria: "Limpieza" },
+  { id: 66, nombre: "Lavandina (4 Litros)",  unidad: "unidad", precio_unidad: 4193.86,  categoria: "Limpieza" },
+  { id: 67, nombre: "Bolsas Residuos",       unidad: "unidad", precio_unidad: 14694,    categoria: "Limpieza" },
 ];
 
 const initialSalsas = [
@@ -276,7 +305,7 @@ const mkBurger = (id, nombre, extras_s, extras_d, extras_t, precio_s, precio_d, 
 ];
 
 const cheeseExtras = [
-  { tipo:"salsa", ref_id:2, nombre:"Salsa Cheese", cantidad:1, unidad:"porcion", merma_pct:0 },
+  { tipo:"salsa", ref_id:2, nombre:"Salsa Cheese", cantidad:0.03, unidad:"kg", merma_pct:0 },
 ];
 const rosesExtras = [
   { tipo:"insumo", ref_id:10, nombre:"Ketchup", cantidad:0.02, unidad:"kg", merma_pct:0 },
@@ -287,59 +316,59 @@ const s1967Extras = [
   { tipo:"insumo", ref_id:5, nombre:"Lechuga", cantidad:0.03, unidad:"kg", merma_pct:20 },
   { tipo:"insumo", ref_id:7, nombre:"Cebolla", cantidad:0.03, unidad:"kg", merma_pct:10 },
   { tipo:"insumo", ref_id:8, nombre:"Pepinillos", cantidad:0.02, unidad:"kg", merma_pct:5 },
-  { tipo:"salsa", ref_id:6, nombre:"Salsa 1967", cantidad:1, unidad:"porcion", merma_pct:0 },
+  { tipo:"salsa", ref_id:6, nombre:"Salsa 1967", cantidad:0.03, unidad:"kg", merma_pct:0 },
 ];
 const classicExtras = [
   { tipo:"insumo", ref_id:5, nombre:"Lechuga", cantidad:0.03, unidad:"kg", merma_pct:20 },
   { tipo:"insumo", ref_id:6, nombre:"Tomate", cantidad:0.04, unidad:"kg", merma_pct:15 },
   { tipo:"insumo", ref_id:7, nombre:"Cebolla", cantidad:0.03, unidad:"kg", merma_pct:10 },
   { tipo:"insumo", ref_id:8, nombre:"Pepinillos", cantidad:0.02, unidad:"kg", merma_pct:5 },
-  { tipo:"salsa", ref_id:3, nombre:"Salsa Classic", cantidad:1, unidad:"porcion", merma_pct:0 },
+  { tipo:"salsa", ref_id:3, nombre:"Salsa Classic", cantidad:0.03, unidad:"kg", merma_pct:0 },
 ];
 const cheeseOnionExtras = [
   { tipo:"insumo", ref_id:7, nombre:"Cebolla", cantidad:0.04, unidad:"kg", merma_pct:10 },
-  { tipo:"salsa", ref_id:2, nombre:"Salsa Cheese", cantidad:1, unidad:"porcion", merma_pct:0 },
+  { tipo:"salsa", ref_id:2, nombre:"Salsa Cheese", cantidad:0.03, unidad:"kg", merma_pct:0 },
 ];
 const cowboyExtras = [
-  { tipo:"salsa", ref_id:4, nombre:"Salsa Cowboy", cantidad:1, unidad:"porcion", merma_pct:0 },
+  { tipo:"salsa", ref_id:4, nombre:"Salsa Cowboy", cantidad:0.03, unidad:"kg", merma_pct:0 },
 ];
 const smokeyExtras = [
   { tipo:"insumo", ref_id:30, nombre:"Panceta", cantidad:0.05, unidad:"kg", merma_pct:10 },
-  { tipo:"salsa", ref_id:11, nombre:"Cebolla crispy", cantidad:1, unidad:"porcion", merma_pct:0 },
+  { tipo:"salsa", ref_id:11, nombre:"Cebolla crispy", cantidad:0.03, unidad:"kg", merma_pct:0 },
   { tipo:"insumo", ref_id:14, nombre:"Barbacoa", cantidad:0.03, unidad:"kg", merma_pct:0 },
-  { tipo:"salsa", ref_id:5, nombre:"Salsa Smokey", cantidad:1, unidad:"porcion", merma_pct:0 },
+  { tipo:"salsa", ref_id:5, nombre:"Salsa Smokey", cantidad:0.03, unidad:"kg", merma_pct:0 },
 ];
 const blueExtras = [
   { tipo:"insumo", ref_id:38, nombre:"Queso roquefort", cantidad:0.04, unidad:"kg", merma_pct:5 },
   { tipo:"insumo", ref_id:40, nombre:"Rucula", cantidad:0.03, unidad:"kg", merma_pct:20 },
   { tipo:"insumo", ref_id:30, nombre:"Panceta", cantidad:0.05, unidad:"kg", merma_pct:10 },
-  { tipo:"salsa", ref_id:12, nombre:"Cebolla caramelizada", cantidad:1, unidad:"porcion", merma_pct:0 },
-  { tipo:"salsa", ref_id:9, nombre:"Salsa Blue", cantidad:1, unidad:"porcion", merma_pct:0 },
+  { tipo:"salsa", ref_id:12, nombre:"Cebolla caramelizada", cantidad:0.03, unidad:"kg", merma_pct:0 },
+  { tipo:"salsa", ref_id:9, nombre:"Salsa Blue", cantidad:0.03, unidad:"kg", merma_pct:0 },
 ];
 const stackedExtras = [
   { tipo:"insumo", ref_id:30, nombre:"Panceta", cantidad:0.05, unidad:"kg", merma_pct:10 },
   { tipo:"insumo", ref_id:42, nombre:"Aros de cebolla", cantidad:0.05, unidad:"kg", merma_pct:5 },
-  { tipo:"salsa", ref_id:1, nombre:"Salsa Stacker", cantidad:1, unidad:"porcion", merma_pct:0 },
+  { tipo:"salsa", ref_id:1, nombre:"Salsa Stacker", cantidad:0.03, unidad:"kg", merma_pct:0 },
 ];
 const cheeseBaconExtras = [
   { tipo:"insumo", ref_id:30, nombre:"Panceta", cantidad:0.05, unidad:"kg", merma_pct:10 },
-  { tipo:"salsa", ref_id:7, nombre:"Salsa Cheesebacon", cantidad:1, unidad:"porcion", merma_pct:0 },
+  { tipo:"salsa", ref_id:7, nombre:"Salsa Cheesebacon", cantidad:0.03, unidad:"kg", merma_pct:0 },
 ];
 const biggieExtras = [
   { tipo:"insumo", ref_id:30, nombre:"Panceta", cantidad:0.05, unidad:"kg", merma_pct:10 },
   { tipo:"insumo", ref_id:5, nombre:"Lechuga", cantidad:0.03, unidad:"kg", merma_pct:20 },
   { tipo:"insumo", ref_id:39, nombre:"Cebolla morada", cantidad:0.03, unidad:"kg", merma_pct:10 },
   { tipo:"insumo", ref_id:8, nombre:"Pepinillos", cantidad:0.02, unidad:"kg", merma_pct:5 },
-  { tipo:"salsa", ref_id:10, nombre:"Salsa Biggie", cantidad:1, unidad:"porcion", merma_pct:0 },
+  { tipo:"salsa", ref_id:10, nombre:"Salsa Biggie", cantidad:0.03, unidad:"kg", merma_pct:0 },
 ];
 const crispyGarlicExtras = [
   { tipo:"insumo", ref_id:30, nombre:"Panceta", cantidad:0.05, unidad:"kg", merma_pct:10 },
-  { tipo:"salsa", ref_id:11, nombre:"Cebolla crispy", cantidad:1, unidad:"porcion", merma_pct:0 },
-  { tipo:"salsa", ref_id:8, nombre:"Salsa Ruby y Crispy Garlic", cantidad:1, unidad:"porcion", merma_pct:0 },
+  { tipo:"salsa", ref_id:11, nombre:"Cebolla crispy", cantidad:0.03, unidad:"kg", merma_pct:0 },
+  { tipo:"salsa", ref_id:8, nombre:"Salsa Ruby y Crispy Garlic", cantidad:0.03, unidad:"kg", merma_pct:0 },
 ];
 const rubyExtras = [
   { tipo:"insumo", ref_id:39, nombre:"Cebolla morada", cantidad:0.03, unidad:"kg", merma_pct:10 },
-  { tipo:"salsa", ref_id:8, nombre:"Salsa Ruby y Crispy Garlic", cantidad:1, unidad:"porcion", merma_pct:0 },
+  { tipo:"salsa", ref_id:8, nombre:"Salsa Ruby y Crispy Garlic", cantidad:0.03, unidad:"kg", merma_pct:0 },
 ];
 
 const initialBurgers = [
@@ -396,13 +425,25 @@ const fmt = (n) => new Intl.NumberFormat("es-AR", { style: "currency", currency:
 const fmt2 = (n) => new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n ?? 0);
 const pct = (n) => `${Math.round(n ?? 0)}%`;
 
+function calcPesoTotalSalsa(salsa) {
+  if (!salsa) return 0;
+  return salsa.ingredientes.reduce((s, ing) => s + ing.cantidad, 0); // total en kg
+}
+
 function calcCostoSalsa(salsa, insumos) {
   if (!salsa || !insumos) return 0;
   const costoTotal = salsa.ingredientes.reduce((s, ing) => {
     const ins = insumos.find(i => i.id === ing.insumo_id);
     return s + (ins ? ins.precio_unidad * ing.cantidad : 0);
   }, 0);
-  return salsa.rendimiento_porciones > 0 ? costoTotal / salsa.rendimiento_porciones : 0;
+  // costo por KG de salsa terminada
+  const pesoKg = calcPesoTotalSalsa(salsa);
+  return pesoKg > 0 ? costoTotal / pesoKg : 0;
+}
+
+// Calcula costo de una cantidad (en kg) de salsa
+function calcCostoSalsaKg(salsa, insumos, cantidadKg) {
+  return calcCostoSalsa(salsa, insumos) * cantidadKg;
 }
 
 function calcCostoIngBurger(ing, insumos, salsas) {
@@ -422,7 +463,7 @@ function calcCostoBurger(burger, insumos, salsas) {
   return burger.ingredientes.reduce((s, ing) => s + calcCostoIngBurger(ing, insumos, salsas), 0);
 }
 
-const CATS_INSUMO = ["Carnes", "Panificados", "Lácteos", "Verduras", "Salsas base", "Especias", "Varios"];
+const CATS_INSUMO = ["Carnes", "Panificados", "Lacteos", "Verduras", "Salsas base", "Aceites", "Especias", "Guarniciones", "Descartables", "Packaging", "Comandera", "Limpieza"];
 const CATS_CF = ["Inmueble", "Servicios", "Personal", "Seguros", "Impuestos", "Financiero", "Otro"];
 const CATS_PROV = ["Proveedor", "Plan de pago", "Otro"];
 const UNIDADES = ["kg", "gr", "unidad", "litro", "ml", "porcion"];
@@ -519,16 +560,19 @@ function InsumosTab({ insumos, setInsumos }) {
 function SalsasTab({ salsas, setSalsas, insumos }) {
   const [sel, setSel] = useState(0);
   const [showNew, setShowNew] = useState(false);
-  const [nf, setNf] = useState({ nombre: "", rendimiento_porciones: 10 });
+  const [nf, setNf] = useState({ nombre: "" });
   const [ni, setNi] = useState({ insumo_id: insumos[0]?.id || "", cantidad: "" });
 
   const salsa = salsas[sel];
-  const costoPorcion = salsa ? calcCostoSalsa(salsa, insumos) : 0;
   const costoReceta = salsa ? salsa.ingredientes.reduce((s, ing) => { const ins = insumos.find(i => i.id === ing.insumo_id); return s + (ins ? ins.precio_unidad * ing.cantidad : 0); }, 0) : 0;
+  const pesoTotalKg = salsa ? calcPesoTotalSalsa(salsa) : 0;
+  const pesoTotalGr = pesoTotalKg * 1000;
+  const costoPorKg = salsa ? calcCostoSalsa(salsa, insumos) : 0;
+  const costoPorGr = costoPorKg / 1000;
 
-  const addS = () => { if (!nf.nombre) return; setSalsas([...salsas, { id: Date.now(), nombre: nf.nombre, rendimiento_porciones: Number(nf.rendimiento_porciones) || 10, ingredientes: [] }]); setSel(salsas.length); setShowNew(false); setNf({ nombre: "", rendimiento_porciones: 10 }); };
+  const addS = () => { if (!nf.nombre) return; setSalsas([...salsas, { id: Date.now(), nombre: nf.nombre, ingredientes: [] }]); setSel(salsas.length); setShowNew(false); setNf({ nombre: "" }); };
   const delS = (i) => { if (salsas.length <= 1) return; setSalsas(salsas.filter((_, ii) => ii !== i)); setSel(Math.max(0, i - 1)); };
-  const updS = (f, v) => setSalsas(salsas.map((s, i) => i !== sel ? s : { ...s, [f]: f === "rendimiento_porciones" ? Number(v) : v }));
+  const updS = (f, v) => setSalsas(salsas.map((s, i) => i !== sel ? s : { ...s, [f]: v }));
   const addI = () => { if (!ni.insumo_id || !ni.cantidad) return; setSalsas(salsas.map((s, i) => i !== sel ? s : { ...s, ingredientes: [...s.ingredientes, { insumo_id: Number(ni.insumo_id), cantidad: Number(ni.cantidad) }] })); setNi({ insumo_id: insumos[0]?.id || "", cantidad: "" }); };
   const delI = (idx) => setSalsas(salsas.map((s, i) => i !== sel ? s : { ...s, ingredientes: s.ingredientes.filter((_, ii) => ii !== idx) }));
   const updI = (idx, f, v) => setSalsas(salsas.map((s, i) => i !== sel ? s : { ...s, ingredientes: s.ingredientes.map((ing, ii) => ii !== idx ? ing : { ...ing, [f]: Number(v) }) }));
@@ -546,7 +590,7 @@ function SalsasTab({ salsas, setSalsas, insumos }) {
         {showNew ? (
           <Card style={{ padding: "11px", marginTop: "5px" }}>
             <input placeholder="Nombre" value={nf.nombre} onChange={e => setNf({ ...nf, nombre: e.target.value })} style={{ ...IS, width: "100%", marginBottom: "5px" }} />
-            <input type="number" placeholder="Porciones que rinde" value={nf.rendimiento_porciones} onChange={e => setNf({ ...nf, rendimiento_porciones: e.target.value })} style={{ ...IS, width: "100%", marginBottom: "7px" }} />
+
             <div style={{ display: "flex", gap: "5px" }}><Btn onClick={addS} style={{ flex: 1 }}>Crear</Btn><Btn onClick={() => setShowNew(false)} variant="ghost" style={{ flex: 1 }}>✕</Btn></div>
           </Card>
         ) : (
@@ -556,15 +600,16 @@ function SalsasTab({ salsas, setSalsas, insumos }) {
 
       {salsa && (
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "11px" }}>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "9px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "9px" }}>
             <StatBox label="Costo total receta" value={fmt(costoReceta)} />
-            <StatBox label="Porciones que rinde" value={salsa.rendimiento_porciones} />
-            <StatBox label="Costo por porción" value={fmt2(costoPorcion)} accent />
+            <StatBox label="Peso total" value={`${Math.round(pesoTotalGr)} gr`} />
+            <StatBox label="Costo por kg" value={fmt(costoPorKg)} />
+            <StatBox label="Costo por gr" value={`$${costoPorGr.toFixed(2)}`} accent />
           </div>
           <Card>
             <div style={{ display: "flex", gap: "11px" }}>
-              <div style={{ flex: 1 }}><div style={{ color: "#222", fontSize: "10px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>NOMBRE</div><input value={salsa.nombre} onChange={e => updS("nombre", e.target.value)} style={{ ...IS, width: "100%" }} /></div>
-              <div style={{ width: "150px" }}><div style={{ color: "#222", fontSize: "10px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>PORCIONES QUE RINDE</div><input type="number" value={salsa.rendimiento_porciones} onChange={e => updS("rendimiento_porciones", e.target.value)} style={{ ...IS, width: "100%" }} /></div>
+              <div style={{ flex: 1 }}><div style={{ color: "#5a8a6e", fontSize: "10px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>NOMBRE</div><input value={salsa.nombre} onChange={e => updS("nombre", e.target.value)} style={{ ...IS, width: "100%" }} /></div>
+              <div style={{ width: "200px" }}><div style={{ color: "#5a8a6e", fontSize: "10px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>PESO TOTAL: {Math.round(pesoTotalGr)}gr — ${costoPorGr.toFixed(2)}/gr</div><div style={{ ...IS, width: "100%", color: "#1a7a3a", fontWeight: "700", padding: "7px 9px" }}>{fmt(costoPorKg)} por kg</div></div>
             </div>
           </Card>
           <Card>
@@ -681,7 +726,7 @@ function BurgersTab({ burgers, setBurgers, insumos, salsas }) {
             {burger.ingredientes.map((ing, idx) => {
               const costoBase = ing.tipo === "insumo"
                 ? (insumos.find(i => i.id === ing.ref_id)?.precio_unidad || 0) * ing.cantidad
-                : calcCostoSalsa(salsas.find(s => s.id === ing.ref_id), insumos) * ing.cantidad;
+                : calcCostoSalsaKg(salsas.find(s => s.id === ing.ref_id), insumos, ing.cantidad);
               const costoMerma = costoBase * ((ing.merma_pct || 0) / 100);
               const costoFinal = costoBase + costoMerma;
               return (
@@ -726,7 +771,7 @@ function BurgersTab({ burgers, setBurgers, insumos, salsas }) {
             <div style={{ marginTop: "9px", padding: "10px 0 0", borderTop: "2px solid #b8dfc4" }}>
               {(() => {
                 const sinMerma = burger.ingredientes.reduce((s, ing) => {
-                  const b = ing.tipo === "insumo" ? (insumos.find(i => i.id === ing.ref_id)?.precio_unidad || 0) * ing.cantidad : calcCostoSalsa(salsas.find(s => s.id === ing.ref_id), insumos) * ing.cantidad;
+                  const b = ing.tipo === "insumo" ? (insumos.find(i => i.id === ing.ref_id)?.precio_unidad || 0) * ing.cantidad : calcCostoSalsaKg(salsas.find(s => s.id === ing.ref_id), insumos, ing.cantidad);
                   return s + b;
                 }, 0);
                 const mermaTotal = costoTotal - sinMerma;
