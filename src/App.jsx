@@ -463,6 +463,26 @@ function calcCostoBurger(burger, insumos, salsas) {
   return burger.ingredientes.reduce((s, ing) => s + calcCostoIngBurger(ing, insumos, salsas), 0);
 }
 
+function calcConsumoVenta(burger, cantidadVendida, salsas) {
+  const consumo = {};
+  for (const ing of burger.ingredientes) {
+    const cantEfectiva = ing.cantidad * (1 + (ing.merma_pct || 0) / 100) * cantidadVendida;
+    if (ing.tipo === "insumo") {
+      consumo[ing.ref_id] = (consumo[ing.ref_id] || 0) + cantEfectiva;
+    } else if (ing.tipo === "salsa") {
+      const salsa = salsas.find(s => s.id === ing.ref_id);
+      if (salsa) {
+        const pesoTotal = calcPesoTotalSalsa(salsa);
+        for (const sIng of salsa.ingredientes) {
+          const cant = pesoTotal > 0 ? (sIng.cantidad / pesoTotal) * cantEfectiva : 0;
+          consumo[sIng.insumo_id] = (consumo[sIng.insumo_id] || 0) + cant;
+        }
+      }
+    }
+  }
+  return consumo;
+}
+
 const CATS_INSUMO = ["Carnes", "Panificados", "Lacteos", "Verduras", "Salsas base", "Aceites", "Especias", "Guarniciones", "Descartables", "Packaging", "Comandera", "Limpieza"];
 const CATS_CF = ["Inmueble", "Servicios", "Personal", "Seguros", "Impuestos", "Financiero", "Otro"];
 const CATS_PROV = ["Proveedor", "Plan de pago", "Otro"];
@@ -985,6 +1005,212 @@ function ProveedoresTab({ proveedores, setProveedores, pagosP, setPagosP, mesKey
     </div>
   );
 }
+// ===================== VENTAS =====================
+function VentasTab({ ventas, setVentas, burgers, insumos, salsas }) {
+  const todayISO = new Date().toISOString().split("T")[0];
+  const [fecha, setFecha] = useState(todayISO);
+  const [burgerId, setBurgerId] = useState("");
+  const [cantidad, setCantidad] = useState("1");
+
+  const fmtFecha = (iso) => { try { const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; } catch { return iso; } };
+
+  const selected = burgers.find(b => b.id === Number(burgerId));
+
+  const add = () => {
+    if (!burgerId || !cantidad || Number(cantidad) <= 0) return;
+    setVentas([...ventas, {
+      id: Date.now(),
+      fecha: fmtFecha(fecha),
+      burger_id: Number(burgerId),
+      burger_nombre: selected?.nombre || "",
+      cantidad: Number(cantidad),
+      precio_unit: selected?.precio_venta || 0,
+    }]);
+    setCantidad("1");
+  };
+
+  const totalVentas = ventas.reduce((s, v) => s + v.precio_unit * v.cantidad, 0);
+  const totalUnidades = ventas.reduce((s, v) => s + v.cantidad, 0);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "9px" }}>
+        <StatBox label="Total ventas" value={fmt(totalVentas)} accent />
+        <StatBox label="Unidades vendidas" value={totalUnidades} accent={totalUnidades > 0} />
+        <StatBox label="Registros" value={ventas.length} />
+      </div>
+
+      <Card>
+        <H title="Registrar venta" />
+        <div style={{ display: "grid", gridTemplateColumns: "140px 1fr 80px auto", gap: "8px", alignItems: "end" }}>
+          <div>
+            <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>FECHA</div>
+            <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} style={{ ...IS, width: "100%" }} />
+          </div>
+          <div>
+            <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>HAMBURGUESA</div>
+            <select value={burgerId} onChange={e => setBurgerId(e.target.value)} style={{ ...IS, width: "100%" }}>
+              <option value="">Seleccionar...</option>
+              {burgers.map(b => <option key={b.id} value={b.id}>{b.nombre} — {fmt(b.precio_venta)}</option>)}
+            </select>
+          </div>
+          <div>
+            <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>CANTIDAD</div>
+            <input type="number" min="1" value={cantidad} onChange={e => setCantidad(e.target.value)} style={{ ...IS, width: "100%" }} />
+          </div>
+          <Btn onClick={add}>+ Agregar</Btn>
+        </div>
+        {selected && (
+          <div style={{ marginTop: "10px", padding: "8px 12px", background: "#f0f9f2", borderRadius: "6px", display: "flex", justifyContent: "space-between", fontFamily: "'DM Mono', monospace", fontSize: "11px", color: "#5a8a6e" }}>
+            <span>Subtotal: <strong style={{ color: "#1a7a3a" }}>{fmt(selected.precio_venta * Number(cantidad || 0))}</strong></span>
+            <span>Precio unit: <strong style={{ color: "#1a7a3a" }}>{fmt(selected.precio_venta)}</strong></span>
+          </div>
+        )}
+      </Card>
+
+      <Card>
+        <H title="Ventas registradas">
+          {ventas.length > 0 && <Btn variant="secondary" onClick={() => { if (window.confirm("¿Borrar todas las ventas?")) setVentas([]); }}>Limpiar</Btn>}
+        </H>
+        {ventas.length > 0 ? (
+          <>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'DM Mono', monospace", fontSize: "12px" }}>
+                <thead>
+                  <tr style={{ borderBottom: "2px solid #c8e6d0" }}>
+                    {["Fecha","Hamburguesa","Cant","Precio unit","Subtotal",""].map(h => (
+                      <th key={h} style={{ padding: "8px 10px", color: "#5a8a6e", fontSize: "9px", letterSpacing: "0.1em", textAlign: h === "Fecha" || h === "Hamburguesa" || h === "" ? "left" : "right", textTransform: "uppercase", fontWeight: "700" }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {ventas.map((v, i) => (
+                    <tr key={v.id} style={{ borderBottom: "1px solid #e8f5ec", background: i % 2 === 0 ? "#fafffe" : "#ffffff" }}>
+                      <td style={{ padding: "9px 10px", color: "#5a8a6e", fontSize: "10px", whiteSpace: "nowrap" }}>{v.fecha}</td>
+                      <td style={{ padding: "9px 10px", color: "#1a3a25" }}>{v.burger_nombre}</td>
+                      <td style={{ padding: "9px 10px", textAlign: "right", color: "#1a3a25", fontWeight: "700" }}>{v.cantidad}</td>
+                      <td style={{ padding: "9px 10px", textAlign: "right", color: "#5a8a6e" }}>{fmt(v.precio_unit)}</td>
+                      <td style={{ padding: "9px 10px", textAlign: "right", color: "#1a7a3a", fontWeight: "700" }}>{fmt(v.precio_unit * v.cantidad)}</td>
+                      <td style={{ padding: "9px 4px" }}><X onClick={() => setVentas(ventas.filter(x => x.id !== v.id))} /></td>
+                    </tr>
+                  ))}
+                </tbody>
+                <tfoot>
+                  <tr style={{ borderTop: "2px solid #c8e6d0" }}>
+                    <td colSpan={2} style={{ padding: "10px", color: "#5a8a6e", fontFamily: "'DM Mono', monospace", fontSize: "11px", fontWeight: "700" }}>TOTAL</td>
+                    <td style={{ padding: "10px", textAlign: "right", fontWeight: "700", fontFamily: "'DM Mono', monospace" }}>{totalUnidades}</td>
+                    <td />
+                    <td style={{ padding: "10px", textAlign: "right", color: "#1a7a3a", fontWeight: "700", fontSize: "14px", fontFamily: "'DM Mono', monospace" }}>{fmt(totalVentas)}</td>
+                    <td />
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </>
+        ) : (
+          <div style={{ textAlign: "center", padding: "32px", color: "#8aba9e", fontFamily: "'DM Mono', monospace", fontSize: "11px" }}>No hay ventas registradas.</div>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// ===================== STOCK =====================
+function StockTab({ insumos, ventas, burgers, salsas, stockInicial, setStockInicial }) {
+  // Calcular consumo total de cada insumo desde las ventas
+  const consumoTotal = {};
+  for (const v of ventas) {
+    const burger = burgers.find(b => b.id === v.burger_id);
+    if (!burger) continue;
+    const consumo = calcConsumoVenta(burger, v.cantidad, salsas);
+    for (const [insumoId, cant] of Object.entries(consumo)) {
+      consumoTotal[insumoId] = (consumoTotal[insumoId] || 0) + cant;
+    }
+  }
+
+  const setStock = (id, val) => setStockInicial(prev => ({ ...prev, [id]: Number(val) || 0 }));
+
+  const fmtCant = (n) => {
+    if (n === undefined || n === null) return "—";
+    return Number(n).toFixed(3).replace(/\.?0+$/, "") || "0";
+  };
+
+  const bycat = CATS_INSUMO.map(cat => ({
+    cat,
+    items: insumos.filter(i => i.categoria === cat)
+  })).filter(g => g.items.length > 0);
+
+  const totalInsumos = insumos.length;
+  const sinStock = insumos.filter(i => !stockInicial[i.id]).length;
+  const enRojo = insumos.filter(i => {
+    const ini = stockInicial[i.id] || 0;
+    const con = consumoTotal[i.id] || 0;
+    return ini > 0 && (ini - con) / ini < 0.1;
+  }).length;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "9px" }}>
+        <StatBox label="Total insumos" value={totalInsumos} />
+        <StatBox label="Sin stock cargado" value={sinStock} warn={sinStock > 0} />
+        <StatBox label="Stock crítico (<10%)" value={enRojo} warn={enRojo > 0} />
+      </div>
+
+      {bycat.map(({ cat, items }) => (
+        <Card key={cat}>
+          <H title={cat} />
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'DM Mono', monospace", fontSize: "12px" }}>
+              <thead>
+                <tr style={{ borderBottom: "2px solid #c8e6d0" }}>
+                  {["Insumo","Unidad","Stock inicial","Consumido","Stock actual","Estado"].map(h => (
+                    <th key={h} style={{ padding: "7px 10px", color: "#5a8a6e", fontSize: "9px", letterSpacing: "0.1em", textAlign: h === "Insumo" ? "left" : "right", textTransform: "uppercase", fontWeight: "700" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {items.map((ins, i) => {
+                  const ini = stockInicial[ins.id] || 0;
+                  const con = consumoTotal[ins.id] || 0;
+                  const actual = ini - con;
+                  const pctLeft = ini > 0 ? actual / ini : null;
+                  const estado = pctLeft === null ? { label: "Sin datos", color: "#aaa", bg: "#f5f5f5" }
+                    : pctLeft < 0 ? { label: "Negativo", color: "#cc0000", bg: "#fff0f0" }
+                    : pctLeft < 0.1 ? { label: "Crítico", color: "#cc4400", bg: "#fff3ee" }
+                    : pctLeft < 0.25 ? { label: "Bajo", color: "#e67e00", bg: "#fffbee" }
+                    : { label: "OK", color: "#1a7a3a", bg: "#f0faf4" };
+                  return (
+                    <tr key={ins.id} style={{ borderBottom: "1px solid #e8f5ec", background: i % 2 === 0 ? "#fafffe" : "#ffffff" }}>
+                      <td style={{ padding: "8px 10px", color: "#1a3a25" }}>{ins.nombre}</td>
+                      <td style={{ padding: "8px 10px", textAlign: "right", color: "#5a8a6e" }}>{ins.unidad}</td>
+                      <td style={{ padding: "8px 10px", textAlign: "right" }}>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.001"
+                          value={stockInicial[ins.id] ?? ""}
+                          onChange={e => setStock(ins.id, e.target.value)}
+                          placeholder="0"
+                          style={{ ...IS, width: "90px", textAlign: "right", padding: "4px 7px", fontSize: "11px" }}
+                        />
+                      </td>
+                      <td style={{ padding: "8px 10px", textAlign: "right", color: con > 0 ? "#cc4400" : "#bbb" }}>{fmtCant(con)}</td>
+                      <td style={{ padding: "8px 10px", textAlign: "right", color: actual < 0 ? "#cc0000" : actual === 0 && ini === 0 ? "#aaa" : "#1a3a25", fontWeight: "700" }}>{ini === 0 && con === 0 ? "—" : fmtCant(actual)}</td>
+                      <td style={{ padding: "8px 10px", textAlign: "right" }}>
+                        <span style={{ background: estado.bg, color: estado.color, padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: "700" }}>{estado.label}</span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
 // ===================== CAJA DIARIA =====================
 function CajaDiariaTab({ cajaDiaria, setCajaDiaria }) {
   const [concepto, setConcepto] = useState("");
@@ -1324,6 +1550,8 @@ const KEYS = {
   caja: "hb-caja", banco: "hb-banco", pedidos: "hb-pedidos",
   ventasDiarias: "hb-ventas-diarias", registros: "hb-registros",
   cajaDiaria: "hb-caja-diaria",
+  stockInicial: "hb-stock-inicial",
+  ventasReg: "hb-ventas-reg",
 };
 
 export default function App() {
@@ -1341,9 +1569,11 @@ export default function App() {
   const [ventasDiarias, setVentasDiarias, r8] = usePersisted(KEYS.ventasDiarias, "");
   const [registros, setRegistros, r9] = usePersisted(KEYS.registros, []);
   const [cajaDiaria, setCajaDiaria, r10] = usePersisted(KEYS.cajaDiaria, []);
+  const [stockInicial, setStockInicial, r11] = usePersisted(KEYS.stockInicial, {});
+  const [ventasReg, setVentasReg, r12] = usePersisted(KEYS.ventasReg, []);
   const mesKey = `${new Date().getFullYear()}-${new Date().getMonth()}`;
 
-  if (![r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,rp0,rp1].every(Boolean)) return (
+  if (![r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,rp0,rp1].every(Boolean)) return (
     <div style={{ minHeight: "100vh", background: "#f0f7f2", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "12px" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;700&display=swap');`}</style>
       <div style={{ fontSize: "28px" }}>🍔</div>
@@ -1358,6 +1588,8 @@ export default function App() {
     { label: "Equilibrio", icon: "⚖️" },
     { label: "Costos fijos", icon: "📋" },
     { label: "Proveedores", icon: "🏭" },
+    { label: "Ventas", icon: "🧾" },
+    { label: "Stock", icon: "📦" },
     { label: "Caja Diaria", icon: "💵" },
     { label: "Caja", icon: "📊" },
   ];
@@ -1400,8 +1632,10 @@ export default function App() {
         {tab === 3 && <PuntoEquilibrioTab burgers={burgers} costosFijos={costosFijos} insumos={insumos} salsas={salsas} />}
         {tab === 4 && <CostosFijosTab costosFijos={costosFijos} setCostosFijos={setCostosFijos} pagos={pagos} setPagos={setPagos} mesKey={mesKey} />}
         {tab === 5 && <ProveedoresTab proveedores={proveedores || []} setProveedores={setProveedores} pagosP={pagosP} setPagosP={setPagosP} mesKey={mesKey} />}
-        {tab === 6 && <CajaDiariaTab cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} />}
-        {tab === 7 && <CajaBancoTab costosFijos={costosFijos} pagos={pagos} proveedores={proveedores || []} pagosP={pagosP} mesKey={mesKey} cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} banco={banco} setBanco={setBanco} pedidosPendientes={pedidos} setPedidosPendientes={setPedidos} ventasDiarias={ventasDiarias} setVentasDiarias={setVentasDiarias} registros={registros || []} setRegistros={setRegistros} />}
+        {tab === 6 && <VentasTab ventas={ventasReg} setVentas={setVentasReg} burgers={burgers} insumos={insumos} salsas={salsas} />}
+        {tab === 7 && <StockTab insumos={insumos} ventas={ventasReg} burgers={burgers} salsas={salsas} stockInicial={stockInicial} setStockInicial={setStockInicial} />}
+        {tab === 8 && <CajaDiariaTab cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} />}
+        {tab === 9 && <CajaBancoTab costosFijos={costosFijos} pagos={pagos} proveedores={proveedores || []} pagosP={pagosP} mesKey={mesKey} cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} banco={banco} setBanco={setBanco} pedidosPendientes={pedidos} setPedidosPendientes={setPedidos} ventasDiarias={ventasDiarias} setVentasDiarias={setVentasDiarias} registros={registros || []} setRegistros={setRegistros} />}
       </div>
     </div>
   );
