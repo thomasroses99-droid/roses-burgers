@@ -28,6 +28,7 @@ const initialInsumos = [
   { id: 2, nombre: "Pan brioche", unidad: "unidad", precio_unidad: 250, categoria: "Panificados" },
   // Lacteos
   { id: 3, nombre: "Queso cheddar", unidad: "kg", precio_unidad: 3200, categoria: "Lácteos" },
+  { id: 38, nombre: "Queso roquefort", unidad: "kg", precio_unidad: 5000, categoria: "Lácteos" },
   { id: 20, nombre: "Leche", unidad: "kg", precio_unidad: 600, categoria: "Lácteos" },
   { id: 21, nombre: "Crema de leche", unidad: "kg", precio_unidad: 1800, categoria: "Lácteos" },
   { id: 22, nombre: "Manteca", unidad: "kg", precio_unidad: 4000, categoria: "Lácteos" },
@@ -36,6 +37,8 @@ const initialInsumos = [
   { id: 5, nombre: "Lechuga", unidad: "kg", precio_unidad: 800, categoria: "Verduras" },
   { id: 6, nombre: "Tomate", unidad: "kg", precio_unidad: 900, categoria: "Verduras" },
   { id: 7, nombre: "Cebolla", unidad: "kg", precio_unidad: 500, categoria: "Verduras" },
+  { id: 39, nombre: "Cebolla morada", unidad: "kg", precio_unidad: 600, categoria: "Verduras" },
+  { id: 40, nombre: "Rucula", unidad: "kg", precio_unidad: 1200, categoria: "Verduras" },
   { id: 12, nombre: "Ajo", unidad: "kg", precio_unidad: 2000, categoria: "Verduras" },
   { id: 24, nombre: "Ajo picado", unidad: "kg", precio_unidad: 2200, categoria: "Verduras" },
   { id: 25, nombre: "Perejil", unidad: "kg", precio_unidad: 800, categoria: "Verduras" },
@@ -49,14 +52,14 @@ const initialInsumos = [
   { id: 14, nombre: "Barbacoa", unidad: "kg", precio_unidad: 1100, categoria: "Salsas base" },
   { id: 16, nombre: "Salsa Inglesa", unidad: "kg", precio_unidad: 1800, categoria: "Salsas base" },
   { id: 17, nombre: "Relish", unidad: "kg", precio_unidad: 2000, categoria: "Salsas base" },
-  // Especias y condimentos
+  // Especias
   { id: 13, nombre: "Pimentón ahumado", unidad: "kg", precio_unidad: 3500, categoria: "Especias" },
   { id: 18, nombre: "Pimienta", unidad: "kg", precio_unidad: 4000, categoria: "Especias" },
   { id: 28, nombre: "Aji Molido", unidad: "kg", precio_unidad: 3000, categoria: "Especias" },
   { id: 29, nombre: "Ajo en polvo", unidad: "kg", precio_unidad: 5000, categoria: "Especias" },
   { id: 31, nombre: "Polvo sabor carne", unidad: "kg", precio_unidad: 6000, categoria: "Especias" },
   { id: 32, nombre: "Sal", unidad: "kg", precio_unidad: 300, categoria: "Especias" },
-  // Varios
+  // Varios / Acompañamientos
   { id: 8, nombre: "Pepinillos", unidad: "kg", precio_unidad: 1800, categoria: "Varios" },
   { id: 19, nombre: "Aceite", unidad: "kg", precio_unidad: 1500, categoria: "Varios" },
   { id: 33, nombre: "Vinagre", unidad: "kg", precio_unidad: 800, categoria: "Varios" },
@@ -64,6 +67,9 @@ const initialInsumos = [
   { id: 35, nombre: "Miel", unidad: "kg", precio_unidad: 3500, categoria: "Varios" },
   { id: 36, nombre: "Humo liquido", unidad: "kg", precio_unidad: 8000, categoria: "Varios" },
   { id: 37, nombre: "Jugo de limon", unidad: "kg", precio_unidad: 1200, categoria: "Varios" },
+  { id: 41, nombre: "Papas fritas", unidad: "kg", precio_unidad: 1800, categoria: "Varios" },
+  { id: 42, nombre: "Aros de cebolla", unidad: "kg", precio_unidad: 2500, categoria: "Varios" },
+  { id: 43, nombre: "Nuggets", unidad: "kg", precio_unidad: 2200, categoria: "Varios" },
 ];
 
 const initialSalsas = [
@@ -195,42 +201,161 @@ const initialSalsas = [
   {
     id: 10, nombre: "Salsa Biggie", rendimiento_porciones: 25,
     ingredientes: [
-      { insumo_id: 9, cantidad: 0.52 },    // Mayonesa 520g
-      { insumo_id: 15, cantidad: 0.045 },  // Mostaza de Dijon 45g
-      { insumo_id: 29, cantidad: 0.001 },  // Ajo en polvo 1g
-      { insumo_id: 27, cantidad: 0.015 },  // Cebolla picada 15g
-      { insumo_id: 18, cantidad: 0.0005 }, // Pimienta 0.5g
-      { insumo_id: 13, cantidad: 0.001 },  // Pimentón ahumado 1g
-      { insumo_id: 31, cantidad: 0.003 },  // Polvo de carne 3g
-      { insumo_id: 37, cantidad: 0.015 },  // Jugo de limon 15g
+      { insumo_id: 9, cantidad: 0.52 },
+      { insumo_id: 15, cantidad: 0.045 },
+      { insumo_id: 29, cantidad: 0.001 },
+      { insumo_id: 27, cantidad: 0.015 },
+      { insumo_id: 18, cantidad: 0.0005 },
+      { insumo_id: 13, cantidad: 0.001 },
+      { insumo_id: 31, cantidad: 0.003 },
+      { insumo_id: 37, cantidad: 0.015 },
+    ]
+  },
+  {
+    id: 11, nombre: "Cebolla crispy", rendimiento_porciones: 10,
+    ingredientes: [
+      { insumo_id: 7, cantidad: 0.5 },
+      { insumo_id: 19, cantidad: 0.5 },
+      { insumo_id: 32, cantidad: 0.005 },
+      { insumo_id: 18, cantidad: 0.002 },
+    ]
+  },
+  {
+    id: 12, nombre: "Cebolla caramelizada", rendimiento_porciones: 10,
+    ingredientes: [
+      { insumo_id: 7, cantidad: 0.5 },
+      { insumo_id: 22, cantidad: 0.05 },
+      { insumo_id: 34, cantidad: 0.03 },
+      { insumo_id: 32, cantidad: 0.003 },
     ]
   },
 ];
 
+// Helper base ingredients per burger (medallón simple=0.1kg, doble=0.2kg, triple=0.3kg)
+// Papas fritas porcion = 0.15kg
+const mkBurger = (id, nombre, extras_s, extras_d, extras_t, precio_s, precio_d, precio_t, precio_sp, precio_dp, precio_tp) => [
+  { id: id*10+1, nombre: `${nombre} - Simple`, precio_venta: precio_s, ingredientes: [
+    { tipo:"insumo", ref_id:2, nombre:"Pan brioche", cantidad:1, unidad:"unidad", merma_pct:0 },
+    { tipo:"insumo", ref_id:1, nombre:"Carne picada", cantidad:0.1, unidad:"kg", merma_pct:15 },
+    { tipo:"insumo", ref_id:3, nombre:"Queso cheddar", cantidad:0.04, unidad:"kg", merma_pct:5 },
+    ...extras_s
+  ]},
+  { id: id*10+2, nombre: `${nombre} - Doble`, precio_venta: precio_d, ingredientes: [
+    { tipo:"insumo", ref_id:2, nombre:"Pan brioche", cantidad:1, unidad:"unidad", merma_pct:0 },
+    { tipo:"insumo", ref_id:1, nombre:"Carne picada", cantidad:0.2, unidad:"kg", merma_pct:15 },
+    { tipo:"insumo", ref_id:3, nombre:"Queso cheddar", cantidad:0.04, unidad:"kg", merma_pct:5 },
+    ...extras_d
+  ]},
+  { id: id*10+3, nombre: `${nombre} - Triple`, precio_venta: precio_t, ingredientes: [
+    { tipo:"insumo", ref_id:2, nombre:"Pan brioche", cantidad:1, unidad:"unidad", merma_pct:0 },
+    { tipo:"insumo", ref_id:1, nombre:"Carne picada", cantidad:0.3, unidad:"kg", merma_pct:15 },
+    { tipo:"insumo", ref_id:3, nombre:"Queso cheddar", cantidad:0.04, unidad:"kg", merma_pct:5 },
+    ...extras_t
+  ]},
+  { id: id*10+4, nombre: `${nombre} - Simple + Papas`, precio_venta: precio_sp, ingredientes: [
+    { tipo:"insumo", ref_id:2, nombre:"Pan brioche", cantidad:1, unidad:"unidad", merma_pct:0 },
+    { tipo:"insumo", ref_id:1, nombre:"Carne picada", cantidad:0.1, unidad:"kg", merma_pct:15 },
+    { tipo:"insumo", ref_id:3, nombre:"Queso cheddar", cantidad:0.04, unidad:"kg", merma_pct:5 },
+    ...extras_s,
+    { tipo:"insumo", ref_id:41, nombre:"Papas fritas", cantidad:0.15, unidad:"kg", merma_pct:5 },
+  ]},
+  { id: id*10+5, nombre: `${nombre} - Doble + Papas`, precio_venta: precio_dp, ingredientes: [
+    { tipo:"insumo", ref_id:2, nombre:"Pan brioche", cantidad:1, unidad:"unidad", merma_pct:0 },
+    { tipo:"insumo", ref_id:1, nombre:"Carne picada", cantidad:0.2, unidad:"kg", merma_pct:15 },
+    { tipo:"insumo", ref_id:3, nombre:"Queso cheddar", cantidad:0.04, unidad:"kg", merma_pct:5 },
+    ...extras_d,
+    { tipo:"insumo", ref_id:41, nombre:"Papas fritas", cantidad:0.15, unidad:"kg", merma_pct:5 },
+  ]},
+  { id: id*10+6, nombre: `${nombre} - Triple + Papas`, precio_venta: precio_tp, ingredientes: [
+    { tipo:"insumo", ref_id:2, nombre:"Pan brioche", cantidad:1, unidad:"unidad", merma_pct:0 },
+    { tipo:"insumo", ref_id:1, nombre:"Carne picada", cantidad:0.3, unidad:"kg", merma_pct:15 },
+    { tipo:"insumo", ref_id:3, nombre:"Queso cheddar", cantidad:0.04, unidad:"kg", merma_pct:5 },
+    ...extras_t,
+    { tipo:"insumo", ref_id:41, nombre:"Papas fritas", cantidad:0.15, unidad:"kg", merma_pct:5 },
+  ]},
+];
+
+const cheeseExtras = [
+  { tipo:"salsa", ref_id:2, nombre:"Salsa Cheese", cantidad:1, unidad:"porcion", merma_pct:0 },
+];
+const rosesExtras = [
+  { tipo:"insumo", ref_id:10, nombre:"Ketchup", cantidad:0.02, unidad:"kg", merma_pct:0 },
+  { tipo:"insumo", ref_id:9, nombre:"Mayonesa", cantidad:0.02, unidad:"kg", merma_pct:0 },
+  { tipo:"insumo", ref_id:7, nombre:"Cebolla", cantidad:0.03, unidad:"kg", merma_pct:10 },
+];
+const s1967Extras = [
+  { tipo:"insumo", ref_id:5, nombre:"Lechuga", cantidad:0.03, unidad:"kg", merma_pct:20 },
+  { tipo:"insumo", ref_id:7, nombre:"Cebolla", cantidad:0.03, unidad:"kg", merma_pct:10 },
+  { tipo:"insumo", ref_id:8, nombre:"Pepinillos", cantidad:0.02, unidad:"kg", merma_pct:5 },
+  { tipo:"salsa", ref_id:6, nombre:"Salsa 1967", cantidad:1, unidad:"porcion", merma_pct:0 },
+];
+const classicExtras = [
+  { tipo:"insumo", ref_id:5, nombre:"Lechuga", cantidad:0.03, unidad:"kg", merma_pct:20 },
+  { tipo:"insumo", ref_id:6, nombre:"Tomate", cantidad:0.04, unidad:"kg", merma_pct:15 },
+  { tipo:"insumo", ref_id:7, nombre:"Cebolla", cantidad:0.03, unidad:"kg", merma_pct:10 },
+  { tipo:"insumo", ref_id:8, nombre:"Pepinillos", cantidad:0.02, unidad:"kg", merma_pct:5 },
+  { tipo:"salsa", ref_id:3, nombre:"Salsa Classic", cantidad:1, unidad:"porcion", merma_pct:0 },
+];
+const cheeseOnionExtras = [
+  { tipo:"insumo", ref_id:7, nombre:"Cebolla", cantidad:0.04, unidad:"kg", merma_pct:10 },
+  { tipo:"salsa", ref_id:2, nombre:"Salsa Cheese", cantidad:1, unidad:"porcion", merma_pct:0 },
+];
+const cowboyExtras = [
+  { tipo:"salsa", ref_id:4, nombre:"Salsa Cowboy", cantidad:1, unidad:"porcion", merma_pct:0 },
+];
+const smokeyExtras = [
+  { tipo:"insumo", ref_id:30, nombre:"Panceta", cantidad:0.05, unidad:"kg", merma_pct:10 },
+  { tipo:"salsa", ref_id:11, nombre:"Cebolla crispy", cantidad:1, unidad:"porcion", merma_pct:0 },
+  { tipo:"insumo", ref_id:14, nombre:"Barbacoa", cantidad:0.03, unidad:"kg", merma_pct:0 },
+  { tipo:"salsa", ref_id:5, nombre:"Salsa Smokey", cantidad:1, unidad:"porcion", merma_pct:0 },
+];
+const blueExtras = [
+  { tipo:"insumo", ref_id:38, nombre:"Queso roquefort", cantidad:0.04, unidad:"kg", merma_pct:5 },
+  { tipo:"insumo", ref_id:40, nombre:"Rucula", cantidad:0.03, unidad:"kg", merma_pct:20 },
+  { tipo:"insumo", ref_id:30, nombre:"Panceta", cantidad:0.05, unidad:"kg", merma_pct:10 },
+  { tipo:"salsa", ref_id:12, nombre:"Cebolla caramelizada", cantidad:1, unidad:"porcion", merma_pct:0 },
+  { tipo:"salsa", ref_id:9, nombre:"Salsa Blue", cantidad:1, unidad:"porcion", merma_pct:0 },
+];
+const stackedExtras = [
+  { tipo:"insumo", ref_id:30, nombre:"Panceta", cantidad:0.05, unidad:"kg", merma_pct:10 },
+  { tipo:"insumo", ref_id:42, nombre:"Aros de cebolla", cantidad:0.05, unidad:"kg", merma_pct:5 },
+  { tipo:"salsa", ref_id:1, nombre:"Salsa Stacker", cantidad:1, unidad:"porcion", merma_pct:0 },
+];
+const cheeseBaconExtras = [
+  { tipo:"insumo", ref_id:30, nombre:"Panceta", cantidad:0.05, unidad:"kg", merma_pct:10 },
+  { tipo:"salsa", ref_id:7, nombre:"Salsa Cheesebacon", cantidad:1, unidad:"porcion", merma_pct:0 },
+];
+const biggieExtras = [
+  { tipo:"insumo", ref_id:30, nombre:"Panceta", cantidad:0.05, unidad:"kg", merma_pct:10 },
+  { tipo:"insumo", ref_id:5, nombre:"Lechuga", cantidad:0.03, unidad:"kg", merma_pct:20 },
+  { tipo:"insumo", ref_id:39, nombre:"Cebolla morada", cantidad:0.03, unidad:"kg", merma_pct:10 },
+  { tipo:"insumo", ref_id:8, nombre:"Pepinillos", cantidad:0.02, unidad:"kg", merma_pct:5 },
+  { tipo:"salsa", ref_id:10, nombre:"Salsa Biggie", cantidad:1, unidad:"porcion", merma_pct:0 },
+];
+const crispyGarlicExtras = [
+  { tipo:"insumo", ref_id:30, nombre:"Panceta", cantidad:0.05, unidad:"kg", merma_pct:10 },
+  { tipo:"salsa", ref_id:11, nombre:"Cebolla crispy", cantidad:1, unidad:"porcion", merma_pct:0 },
+  { tipo:"salsa", ref_id:8, nombre:"Salsa Ruby y Crispy Garlic", cantidad:1, unidad:"porcion", merma_pct:0 },
+];
+const rubyExtras = [
+  { tipo:"insumo", ref_id:39, nombre:"Cebolla morada", cantidad:0.03, unidad:"kg", merma_pct:10 },
+  { tipo:"salsa", ref_id:8, nombre:"Salsa Ruby y Crispy Garlic", cantidad:1, unidad:"porcion", merma_pct:0 },
+];
+
 const initialBurgers = [
-  {
-    id: 1, nombre: "Classic Smash", precio_venta: 3500,
-    ingredientes: [
-      { tipo: "insumo", ref_id: 1, nombre: "Carne picada", cantidad: 0.2, unidad: "kg", merma_pct: 15 },
-      { tipo: "insumo", ref_id: 2, nombre: "Pan brioche", cantidad: 1, unidad: "unidad", merma_pct: 0 },
-      { tipo: "insumo", ref_id: 3, nombre: "Queso cheddar", cantidad: 0.04, unidad: "kg", merma_pct: 5 },
-      { tipo: "insumo", ref_id: 5, nombre: "Lechuga", cantidad: 0.03, unidad: "kg", merma_pct: 20 },
-      { tipo: "insumo", ref_id: 6, nombre: "Tomate", cantidad: 0.05, unidad: "kg", merma_pct: 15 },
-      { tipo: "insumo", ref_id: 7, nombre: "Cebolla", cantidad: 0.04, unidad: "kg", merma_pct: 10 },
-      { tipo: "salsa", ref_id: 1, nombre: "Salsa especial", cantidad: 1, unidad: "porcion", merma_pct: 0 },
-    ]
-  },
-  {
-    id: 2, nombre: "Double Bacon", precio_venta: 4800,
-    ingredientes: [
-      { tipo: "insumo", ref_id: 1, nombre: "Carne picada", cantidad: 0.4, unidad: "kg", merma_pct: 15 },
-      { tipo: "insumo", ref_id: 2, nombre: "Pan brioche", cantidad: 1, unidad: "unidad", merma_pct: 0 },
-      { tipo: "insumo", ref_id: 3, nombre: "Queso cheddar", cantidad: 0.06, unidad: "kg", merma_pct: 5 },
-      { tipo: "insumo", ref_id: 4, nombre: "Bacon", cantidad: 0.06, unidad: "kg", merma_pct: 10 },
-      { tipo: "insumo", ref_id: 8, nombre: "Pepinillos", cantidad: 0.03, unidad: "kg", merma_pct: 5 },
-      { tipo: "salsa", ref_id: 2, nombre: "BBQ casera", cantidad: 1, unidad: "porcion", merma_pct: 0 },
-    ]
-  },
+  ...mkBurger(1,"Cheeseburger", cheeseExtras, cheeseExtras, cheeseExtras, 11000,13000,15000,13500,15500,17500),
+  ...mkBurger(2,"Roses", rosesExtras, rosesExtras, rosesExtras, 11000,13000,15000,13500,15500,17500),
+  ...mkBurger(3,"1967", s1967Extras, s1967Extras, s1967Extras, 11000,13000,15000,13500,15500,17500),
+  ...mkBurger(4,"Classic", classicExtras, classicExtras, classicExtras, 11000,13000,15000,13500,15500,17500),
+  ...mkBurger(5,"Cheese Onion", cheeseOnionExtras, cheeseOnionExtras, cheeseOnionExtras, 11000,13000,15000,13500,15500,17500),
+  ...mkBurger(6,"Cowboy", cowboyExtras, cowboyExtras, cowboyExtras, 11000,13000,15000,13500,15500,17500),
+  ...mkBurger(7,"Smokey Bacon", smokeyExtras, smokeyExtras, smokeyExtras, 11000,13000,15000,13500,15500,17500),
+  ...mkBurger(8,"Blue Cheese", blueExtras, blueExtras, blueExtras, 11000,13000,15000,13500,15500,17500),
+  ...mkBurger(9,"Stacked Onion", stackedExtras, stackedExtras, stackedExtras, 11000,13000,15000,13500,15500,17500),
+  ...mkBurger(10,"Cheese Bacon", cheeseBaconExtras, cheeseBaconExtras, cheeseBaconExtras, 11000,13000,15000,13500,15500,17500),
+  ...mkBurger(11,"Biggie Burger", biggieExtras, biggieExtras, biggieExtras, 11000,13000,15000,13500,15500,17500),
+  ...mkBurger(12,"Crispy Garlic", crispyGarlicExtras, crispyGarlicExtras, crispyGarlicExtras, 11000,13000,15000,13500,15500,17500),
+  ...mkBurger(13,"Ruby Clove", rubyExtras, rubyExtras, rubyExtras, 11000,13000,15000,13500,15500,17500),
 ];
 
 const initialCostosFijos = [
