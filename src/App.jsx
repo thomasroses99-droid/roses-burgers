@@ -359,13 +359,34 @@ const initialBurgers = [
 ];
 
 const initialCostosFijos = [
-  { id: 1, nombre: "Alquiler local", monto: 120000, categoria: "Inmueble" },
-  { id: 2, nombre: "Luz", monto: 35000, categoria: "Servicios" },
-  { id: 3, nombre: "Gas", monto: 18000, categoria: "Servicios" },
-  { id: 4, nombre: "Internet", monto: 8000, categoria: "Servicios" },
-  { id: 5, nombre: "Sueldo empleado", monto: 180000, categoria: "Personal" },
-  { id: 6, nombre: "Seguro", monto: 15000, categoria: "Seguros" },
+  { id: 1,  nombre: "SUSS",               monto: 1039248, categoria: "Impuestos" },
+  { id: 2,  nombre: "IVA",                monto: 1534252, categoria: "Impuestos" },
+  { id: 3,  nombre: "Drei",               monto: 223435,  categoria: "Impuestos" },
+  { id: 4,  nombre: "Contador",           monto: 180000,  categoria: "Personal" },
+  { id: 5,  nombre: "CM",                 monto: 665000,  categoria: "Impuestos" },
+  { id: 6,  nombre: "Aguas Alberdi",      monto: 30838,   categoria: "Servicios" },
+  { id: 7,  nombre: "Gas Alberdi",        monto: 82306,   categoria: "Servicios" },
+  { id: 8,  nombre: "EPE Fisherton",      monto: 327854,  categoria: "Servicios" },
+  { id: 9,  nombre: "EPE Alberdi",        monto: 125714,  categoria: "Servicios" },
+  { id: 10, nombre: "Maxirest",           monto: 116500,  categoria: "Servicios" },
+  { id: 11, nombre: "Internet Fisherton", monto: 30000,   categoria: "Servicios" },
+  { id: 12, nombre: "Sindicato",          monto: 108598,  categoria: "Personal" },
+  { id: 13, nombre: "Alquiler Alberdi",   monto: 480102,  categoria: "Inmueble" },
+  { id: 14, nombre: "Alquiler Fisherton", monto: 1081000, categoria: "Inmueble" },
+  { id: 15, nombre: "Cuota Alejo",        monto: 286000,  categoria: "Personal" },
+  { id: 16, nombre: "Sistema urgencias",  monto: 83000,   categoria: "Servicios" },
+  { id: 17, nombre: "Plan de Pago IVA",   monto: 0,       categoria: "Impuestos" },
+  { id: 18, nombre: "Seguro Incendio",    monto: 51399,   categoria: "Seguros" },
+  { id: 19, nombre: "Autonomos",          monto: 104044,  categoria: "Impuestos" },
+  { id: 20, nombre: "Alarmas",            monto: 81225,   categoria: "Servicios" },
+  { id: 21, nombre: "Fumigador",          monto: 62000,   categoria: "Servicios" },
+  { id: 22, nombre: "Gas Fisherton",      monto: 204036,  categoria: "Servicios" },
+  { id: 23, nombre: "DDJJ",               monto: 0,       categoria: "Impuestos" },
+  { id: 24, nombre: "Plan de pago Aut",   monto: 0,       categoria: "Impuestos" },
+  { id: 25, nombre: "Cuota tarjeta",      monto: 1300000, categoria: "Financiero" },
 ];
+
+const initialProveedores = [];
 
 // ===================== HELPERS =====================
 const diasDelMes = () => new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
@@ -402,7 +423,8 @@ function calcCostoBurger(burger, insumos, salsas) {
 }
 
 const CATS_INSUMO = ["Carnes", "Panificados", "Lácteos", "Verduras", "Salsas base", "Especias", "Varios"];
-const CATS_CF = ["Inmueble", "Servicios", "Personal", "Seguros", "Impuestos", "Otro"];
+const CATS_CF = ["Inmueble", "Servicios", "Personal", "Seguros", "Impuestos", "Financiero", "Otro"];
+const CATS_PROV = ["Proveedor", "Plan de pago", "Otro"];
 const UNIDADES = ["kg", "gr", "unidad", "litro", "ml", "porcion"];
 
 // ===================== UI =====================
@@ -843,51 +865,159 @@ function CostosFijosTab({ costosFijos, setCostosFijos, pagos, setPagos, mesKey }
   );
 }
 
-// ===================== CAJA & PROYECCIÓN =====================
-function CajaBancoTab({ costosFijos, pagos, mesKey, caja, setCaja, banco, setBanco, pedidosPendientes, setPedidosPendientes, ventasDiarias, setVentasDiarias, registros, setRegistros }) {
+// ===================== PROVEEDORES =====================
+function ProveedoresTab({ proveedores, setProveedores, pagosP, setPagosP, mesKey }) {
+  const [nf, setNf] = useState({ nombre: "", deuda: "", categoria: "Proveedor" });
+  const totalDeuda = proveedores.reduce((s, p) => s + p.deuda, 0);
+  const totalPagado = proveedores.filter(p => pagosP[`${mesKey}-p-${p.id}`]).reduce((s, p) => s + p.deuda, 0);
+  const totalPendiente = totalDeuda - totalPagado;
+  const bycat = CATS_PROV.map(cat => ({ cat, items: proveedores.filter(p => p.categoria === cat) })).filter(g => g.items.length > 0);
+
+  const add = () => {
+    if (!nf.nombre || !nf.deuda) return;
+    setProveedores([...proveedores, { id: Date.now(), nombre: nf.nombre, deuda: Number(nf.deuda), categoria: nf.categoria }]);
+    setNf({ ...nf, nombre: "", deuda: "" });
+  };
+  const del = (id) => setProveedores(proveedores.filter(p => p.id !== id));
+  const tog = (id) => { const k = `${mesKey}-p-${id}`; setPagosP({ ...pagosP, [k]: !pagosP[k] }); };
+  const upd = (id, f, v) => setProveedores(proveedores.map(p => p.id !== id ? p : { ...p, [f]: f === "deuda" ? Number(v) : v }));
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "9px" }}>
+        <StatBox label="Total adeudado proveedores" value={fmt(totalDeuda)} warn={totalDeuda > 0} />
+        <StatBox label="Ya pagado" value={fmt(totalPagado)} accent />
+        <StatBox label="Pendiente de pago" value={fmt(totalPendiente)} warn={totalPendiente > 0} />
+      </div>
+
+      {totalDeuda > 0 && (
+        <Card style={{ padding: "13px 16px" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
+            <span style={{ color: "#5a8a6e", fontSize: "10px", fontFamily: "'DM Mono', monospace" }}>Progreso de pagos — {mesActual}</span>
+            <span style={{ color: "#1a7a3a", fontFamily: "'DM Mono', monospace", fontSize: "11px", fontWeight: "700" }}>{totalDeuda > 0 ? pct((totalPagado / totalDeuda) * 100) : "0%"}</span>
+          </div>
+          <div style={{ height: "8px", background: "#e8f5ec", borderRadius: "4px", overflow: "hidden" }}>
+            <div style={{ width: `${totalDeuda > 0 ? (totalPagado / totalDeuda) * 100 : 0}%`, height: "100%", background: "linear-gradient(90deg, #1a7a3a, #4CAF50)", transition: "width 0.3s", borderRadius: "4px" }} />
+          </div>
+        </Card>
+      )}
+
+      {bycat.map(({ cat, items }) => (
+        <Card key={cat}>
+          <div style={{ marginBottom: "9px", color: "#7aaa8e", fontSize: "10px", letterSpacing: "0.12em", textTransform: "uppercase", fontFamily: "'DM Mono', monospace" }}>{cat}</div>
+          {items.map(p => {
+            const pagado = pagosP[`${mesKey}-p-${p.id}`];
+            return (
+              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: "9px", padding: "8px 0", borderTop: "1px solid #ddeee3" }}>
+                <button onClick={() => tog(p.id)} style={{ width: "24px", height: "24px", borderRadius: "50%", background: pagado ? "#1a7a3a" : "#eaf4ed", border: `2px solid ${pagado ? "#1a7a3a" : "#c8e6d0"}`, color: pagado ? "#fff" : "#6a9a7e", cursor: "pointer", fontSize: "11px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{pagado ? "✓" : "○"}</button>
+                <input value={p.nombre} onChange={e => upd(p.id, "nombre", e.target.value)} style={{ ...IS, flex: 1, color: pagado ? "#6a9a7e" : "#1a3a25", textDecoration: pagado ? "line-through" : "none" }} />
+                <div style={{ display: "flex", alignItems: "center", gap: "4px" }}>
+                  <span style={{ color: "#7aaa8e", fontSize: "11px" }}>$</span>
+                  <input type="number" value={p.deuda} onChange={e => upd(p.id, "deuda", e.target.value)} style={{ ...IS, width: "130px", color: pagado ? "#6a9a7e" : "#cc4400", fontWeight: "700" }} />
+                </div>
+                <X onClick={() => del(p.id)} />
+              </div>
+            );
+          })}
+        </Card>
+      ))}
+
+      {proveedores.length === 0 && (
+        <Card>
+          <div style={{ textAlign: "center", padding: "20px", color: "#7aaa8e", fontFamily: "'DM Mono', monospace", fontSize: "12px" }}>No hay proveedores cargados todavía</div>
+        </Card>
+      )}
+
+      <Card>
+        <H title="Agregar proveedor" />
+        <div style={{ display: "flex", gap: "7px", flexWrap: "wrap" }}>
+          <input placeholder="Nombre del proveedor" value={nf.nombre} onChange={e => setNf({ ...nf, nombre: e.target.value })} style={{ ...IS, flex: "1 1 150px" }} />
+          <select value={nf.categoria} onChange={e => setNf({ ...nf, categoria: e.target.value })} style={{ ...IS }}>{CATS_PROV.map(c => <option key={c}>{c}</option>)}</select>
+          <input type="number" placeholder="Deuda actual $" value={nf.deuda} onChange={e => setNf({ ...nf, deuda: e.target.value })} style={{ ...IS, width: "140px" }} />
+          <Btn onClick={add}>+ Agregar</Btn>
+        </div>
+      </Card>
+    </div>
+  );
+}
+function CajaBancoTab({ costosFijos, pagos, proveedores, pagosP, mesKey, caja, setCaja, banco, setBanco, pedidosPendientes, setPedidosPendientes, ventasDiarias, setVentasDiarias, registros, setRegistros }) {
   const [ventasHoy, setVentasHoy] = useState("");
   const totalFijos = costosFijos.reduce((s, c) => s + c.monto, 0);
-  const totalPagado = costosFijos.filter(c => pagos[`${mesKey}-${c.id}`]).reduce((s, c) => s + c.monto, 0);
-  const pendiente = totalFijos - totalPagado;
+  const totalFijosPagado = costosFijos.filter(c => pagos[`${mesKey}-${c.id}`]).reduce((s, c) => s + c.monto, 0);
+  const fijosPendientes = totalFijos - totalFijosPagado;
+
+  const totalProveedores = (proveedores || []).reduce((s, p) => s + p.deuda, 0);
+  const totalProvPagado = (proveedores || []).filter(p => pagosP[`${mesKey}-p-${p.id}`]).reduce((s, p) => s + p.deuda, 0);
+  const provPendientes = totalProveedores - totalProvPagado;
+
   const disponible = (Number(caja) || 0) + (Number(banco) || 0) + (Number(pedidosPendientes) || 0);
-  const posNeta = disponible - pendiente;
+  const totalObligaciones = fijosPendientes + provPendientes;
+  const posNeta = disponible - totalObligaciones;
+  const despuesProveedores = disponible - provPendientes;
+  const paraFijos = despuesProveedores - fijosPendientes;
+
   const diasRest = diasDelMes() - hoy;
   const regList = registros || [];
   const promDiario = regList.length > 0 ? regList.reduce((s, r) => s + r.ventas, 0) / regList.length : Number(ventasDiarias) || 0;
   const proyVentas = promDiario * diasRest;
-  const proyFinal = disponible + proyVentas - pendiente;
-  const sc = proyFinal >= 0 ? "#4CAF50" : "#FF6B35";
+  const proyFinal = disponible + proyVentas - totalObligaciones;
+  const sc = proyFinal >= 0 ? "#1a7a3a" : "#cc4400";
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+      {/* Inputs caja */}
       <Card>
         <H title={`Estado actual — Día ${hoy} / ${diasDelMes()}`} />
         <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "11px" }}>
           {[["💵 Caja (efectivo)", caja, setCaja], ["🏦 Banco", banco, setBanco], ["📦 Pedidos pendientes cobro", pedidosPendientes, setPedidosPendientes]].map(([lbl, v, sv]) => (
-            <div key={lbl}><div style={{ color: "#222", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>{lbl}</div><input type="number" placeholder="$" value={v} onChange={e => sv(e.target.value)} style={{ ...IS, width: "100%" }} /></div>
+            <div key={lbl}><div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>{lbl}</div><input type="number" placeholder="$" value={v} onChange={e => sv(e.target.value)} style={{ ...IS, width: "100%" }} /></div>
           ))}
         </div>
       </Card>
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
-        <div style={{ display: "flex", flexDirection: "column", gap: "9px" }}>
-          <StatBox label="Total disponible" value={fmt(disponible)} />
-          <StatBox label="Costos fijos pendientes" value={fmt(pendiente)} warn={pendiente > 0} />
-          <StatBox label="Posición neta hoy" value={fmt(posNeta)} accent={posNeta >= 0} warn={posNeta < 0} sub={posNeta >= 0 ? "✓ Superávit" : "⚠ Déficit"} />
+
+      {/* Resumen financiero completo */}
+      <Card style={{ border: "1px solid #c8e6d0" }}>
+        <H title="Resumen financiero del mes" />
+        <div style={{ display: "flex", flexDirection: "column", gap: "0px" }}>
+          {[
+            { label: "Total disponible (caja + banco + cobros)", value: disponible, color: "#1a7a3a", bold: true },
+            { label: "— Proveedores pendientes de pago", value: -provPendientes, color: "#cc4400" },
+            { label: "= Disponible después de proveedores", value: despuesProveedores, color: despuesProveedores >= 0 ? "#1a5c2a" : "#cc4400", bold: true, sep: true },
+            { label: "— Costos fijos pendientes", value: -fijosPendientes, color: "#cc4400" },
+            { label: "= Saldo neto después de todo", value: paraFijos, color: paraFijos >= 0 ? "#1a7a3a" : "#cc4400", bold: true, sep: true },
+          ].map((row, i) => (
+            <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: `${row.sep ? "10px 0 6px" : "6px 0"}`, borderTop: row.sep ? "2px solid #c8e6d0" : "1px solid #e8f5ec", marginTop: row.sep ? "4px" : "0" }}>
+              <span style={{ color: "#5a8a6e", fontSize: "12px", fontFamily: "'DM Mono', monospace" }}>{row.label}</span>
+              <span style={{ color: row.color, fontFamily: "'DM Mono', monospace", fontSize: row.bold ? "15px" : "13px", fontWeight: row.bold ? "700" : "400" }}>{fmt(Math.abs(row.value))}{row.value < 0 && row.label.startsWith("—") ? "" : ""}</span>
+            </div>
+          ))}
         </div>
-        <Card style={{ border: `1px solid ${sc}20`, background: `${sc}05` }}>
-          <div style={{ color: sc, fontSize: "9px", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: "5px" }}>Proyección fin de mes</div>
-          <div style={{ color: sc, fontSize: "28px", fontWeight: "700", fontFamily: "'DM Mono', monospace", marginBottom: "9px" }}>{fmt(proyFinal)}</div>
-          <div style={{ color: "#222", fontSize: "10px", lineHeight: "1.9", fontFamily: "'DM Mono', monospace" }}>
-            <div>Días restantes: <span style={{ color: "#222" }}>{diasRest}</span></div>
-            <div>Prom venta/día: <span style={{ color: "#222" }}>{fmt(promDiario)}</span></div>
-            <div>Ventas proyectadas: <span style={{ color: "#222" }}>{fmt(proyVentas)}</span></div>
-          </div>
-          <div style={{ marginTop: "10px" }}>
-            <div style={{ color: "#3a4e3a", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>VENTA DIARIA MANUAL (si no hay registros)</div>
-            <input type="number" placeholder="$" value={ventasDiarias} onChange={e => setVentasDiarias(e.target.value)} style={{ ...IS, width: "100%" }} />
-          </div>
-        </Card>
+      </Card>
+
+      {/* Stats grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "9px" }}>
+        <StatBox label="Proveedores pendientes" value={fmt(provPendientes)} warn={provPendientes > 0} />
+        <StatBox label="Costos fijos pendientes" value={fmt(fijosPendientes)} warn={fijosPendientes > 0} />
+        <StatBox label="Posición neta hoy" value={fmt(posNeta)} accent={posNeta >= 0} warn={posNeta < 0} sub={posNeta >= 0 ? "✓ Superávit" : "⚠ Déficit"} />
       </div>
+
+      {/* Proyección */}
+      <Card style={{ border: `1px solid ${sc}30`, background: `${sc}05` }}>
+        <div style={{ color: sc, fontSize: "9px", letterSpacing: "0.1em", textTransform: "uppercase", fontFamily: "'DM Mono', monospace", marginBottom: "5px" }}>Proyección fin de mes</div>
+        <div style={{ color: sc, fontSize: "28px", fontWeight: "700", fontFamily: "'DM Mono', monospace", marginBottom: "9px" }}>{fmt(proyFinal)}</div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "6px", color: "#5a8a6e", fontSize: "11px", lineHeight: "1.9", fontFamily: "'DM Mono', monospace" }}>
+          <div>Días restantes: <span style={{ color: "#1a3a25", fontWeight:"700" }}>{diasRest}</span></div>
+          <div>Prom venta/día: <span style={{ color: "#1a3a25", fontWeight:"700" }}>{fmt(promDiario)}</span></div>
+          <div>Ventas proyectadas: <span style={{ color: "#1a3a25", fontWeight:"700" }}>{fmt(proyVentas)}</span></div>
+          <div>Total obligaciones: <span style={{ color: "#cc4400", fontWeight:"700" }}>{fmt(totalObligaciones)}</span></div>
+        </div>
+        <div style={{ marginTop: "10px" }}>
+          <div style={{ color: "#6a9a7e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>VENTA DIARIA MANUAL (si no hay registros)</div>
+          <input type="number" placeholder="$" value={ventasDiarias} onChange={e => setVentasDiarias(e.target.value)} style={{ ...IS, width: "100%" }} />
+        </div>
+      </Card>
+
+      {/* Registro diario */}
       <Card>
         <H title="Registro diario de ventas" />
         <div style={{ display: "flex", gap: "7px", marginBottom: "13px" }}>
@@ -897,22 +1027,22 @@ function CajaBancoTab({ costosFijos, pagos, mesKey, caja, setCaja, banco, setBan
         {regList.length > 0 ? (
           <>
             <div style={{ display: "flex", alignItems: "flex-end", gap: "3px", height: "50px", marginBottom: "11px" }}>
-              {regList.map((r, i) => { const mx = Math.max(...regList.map(x => x.ventas)); const h = mx > 0 ? (r.ventas / mx) * 100 : 0; return <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "1px" }}><div style={{ width: "100%", height: `${h}%`, background: "#1a7a3a", borderRadius: "2px 2px 0 0", minHeight: "3px" }} title={`Día ${r.dia}: ${fmt(r.ventas)}`} /><span style={{ color: "#1a5c2a", fontSize: "8px" }}>{r.dia}</span></div>; })}
+              {regList.map((r, i) => { const mx = Math.max(...regList.map(x => x.ventas)); const h = mx > 0 ? (r.ventas / mx) * 100 : 0; return <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: "1px" }}><div style={{ width: "100%", height: `${h}%`, background: "#1a7a3a", borderRadius: "2px 2px 0 0", minHeight: "3px" }} title={`Día ${r.dia}: ${fmt(r.ventas)}`} /><span style={{ color: "#5a8a6e", fontSize: "8px" }}>{r.dia}</span></div>; })}
             </div>
             {regList.map((r, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: "9px", padding: "6px 0", borderBottom: "1px solid #e0f0e6" }}>
-                <span style={{ color: "#222", fontFamily: "'DM Mono', monospace", fontSize: "10px", width: "45px" }}>Día {r.dia}</span>
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: "9px", padding: "6px 0", borderBottom: "1px solid #ddeee3" }}>
+                <span style={{ color: "#5a8a6e", fontFamily: "'DM Mono', monospace", fontSize: "10px", width: "45px" }}>Día {r.dia}</span>
                 <span style={{ color: "#1a7a3a", fontFamily: "'DM Mono', monospace", fontSize: "12px", fontWeight: "700", flex: 1 }}>{fmt(r.ventas)}</span>
                 <X onClick={() => setRegistros(regList.filter((_, ii) => ii !== i))} />
               </div>
             ))}
-            <div style={{ display: "flex", justifyContent: "space-between", padding: "9px 0 0", borderTop: "2px solid #b8dfc4" }}>
-              <span style={{ color: "#222", fontFamily: "'DM Mono', monospace", fontSize: "11px" }}>Total acumulado</span>
-              <span style={{ color: "#4CAF50", fontFamily: "'DM Mono', monospace", fontSize: "13px", fontWeight: "700" }}>{fmt(regList.reduce((s, r) => s + r.ventas, 0))}</span>
+            <div style={{ display: "flex", justifyContent: "space-between", padding: "9px 0 0", borderTop: "2px solid #c8e6d0" }}>
+              <span style={{ color: "#5a8a6e", fontFamily: "'DM Mono', monospace", fontSize: "11px" }}>Total acumulado</span>
+              <span style={{ color: "#1a7a3a", fontFamily: "'DM Mono', monospace", fontSize: "13px", fontWeight: "700" }}>{fmt(regList.reduce((s, r) => s + r.ventas, 0))}</span>
             </div>
           </>
         ) : (
-          <div style={{ textAlign: "center", padding: "18px", color: "#222", fontFamily: "'DM Mono', monospace", fontSize: "11px" }}>No hay ventas registradas este mes</div>
+          <div style={{ textAlign: "center", padding: "18px", color: "#8aba9e", fontFamily: "'DM Mono', monospace", fontSize: "11px" }}>No hay ventas registradas este mes</div>
         )}
       </Card>
     </div>
@@ -922,7 +1052,8 @@ function CajaBancoTab({ costosFijos, pagos, mesKey, caja, setCaja, banco, setBan
 // ===================== APP =====================
 const KEYS = {
   insumos: "hb-insumos-v2", salsas: "hb-salsas-v2", burgers: "hb-burgers-v2",
-  costosFijos: "hb-costos-fijos", pagos: "hb-pagos",
+  costosFijos: "hb-costos-fijos-v2", pagos: "hb-pagos",
+  proveedores: "hb-proveedores", pagosP: "hb-pagos-p",
   caja: "hb-caja", banco: "hb-banco", pedidos: "hb-pedidos",
   ventasDiarias: "hb-ventas-diarias", registros: "hb-registros",
 };
@@ -934,13 +1065,15 @@ export default function App() {
   const [burgers, setBurgers, r2] = usePersisted(KEYS.burgers, initialBurgers);
   const [costosFijos, setCostosFijos, r3] = usePersisted(KEYS.costosFijos, initialCostosFijos);
   const [pagos, setPagos, r4] = usePersisted(KEYS.pagos, {});
+  const [proveedores, setProveedores, rp0] = usePersisted(KEYS.proveedores, initialProveedores);
+  const [pagosP, setPagosP, rp1] = usePersisted(KEYS.pagosP, {});
   const [caja, setCaja, r5] = usePersisted(KEYS.caja, "");
   const [banco, setBanco, r6] = usePersisted(KEYS.banco, "");
   const [pedidos, setPedidos, r7] = usePersisted(KEYS.pedidos, "");
   const [ventasDiarias, setVentasDiarias, r8] = usePersisted(KEYS.ventasDiarias, "");
   const [registros, setRegistros, r9] = usePersisted(KEYS.registros, []);
   const mesKey = `${new Date().getFullYear()}-${new Date().getMonth()}`;
-  if (![r0,r1,r2,r3,r4,r5,r6,r7,r8,r9].every(Boolean)) return (
+  if (![r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,rp0,rp1].every(Boolean)) return (
     <div style={{ minHeight: "100vh", background: "#f0f7f2", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "12px" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;700&display=swap');`}</style>
       <div style={{ fontSize: "28px" }}>🍔</div>
@@ -954,6 +1087,7 @@ export default function App() {
     { label: "Hamburguesas", icon: "🍔" },
     { label: "Equilibrio", icon: "⚖️" },
     { label: "Costos fijos", icon: "📋" },
+    { label: "Proveedores", icon: "🏭" },
     { label: "Caja", icon: "📊" },
   ];
 
@@ -973,13 +1107,13 @@ export default function App() {
             <div style={{ background: "#1a7a3a", color: "#d4edd9", borderRadius: "9px", padding: "6px 11px", fontSize: "17px" }}>🍔</div>
             <div>
               <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: "700", fontSize: "14px" }}>Roses Burgers</div>
-              <div style={{ color: "#222", fontSize: "9px", fontFamily: "'DM Mono', monospace" }}>Sistema de costos</div>
+              <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace" }}>Sistema de costos y gestión</div>
             </div>
           </div>
-          <div style={{ color: "#1a5c2a", fontFamily: "'DM Mono', monospace", fontSize: "10px", textAlign: "right" }}>
-            <div style={{ color: "#1a7a3a80" }}>{mesActual.toUpperCase()}</div>
+          <div style={{ color: "#6a9a7e", fontFamily: "'DM Mono', monospace", fontSize: "10px", textAlign: "right" }}>
+            <div style={{ color: "#1a7a3a" }}>{mesActual.toUpperCase()}</div>
             <div>Día {hoy} de {diasDelMes()}</div>
-            <div style={{ color: "#1a7a3a", fontSize: "9px", marginTop: "1px" }}>💾 auto-guardado</div>
+            <div style={{ color: "#2a6a3a", fontSize: "9px", marginTop: "1px" }}>💾 auto-guardado</div>
           </div>
         </div>
       </div>
@@ -994,7 +1128,8 @@ export default function App() {
         {tab === 2 && <BurgersTab burgers={burgers} setBurgers={setBurgers} insumos={insumos} salsas={salsas} />}
         {tab === 3 && <PuntoEquilibrioTab burgers={burgers} costosFijos={costosFijos} insumos={insumos} salsas={salsas} />}
         {tab === 4 && <CostosFijosTab costosFijos={costosFijos} setCostosFijos={setCostosFijos} pagos={pagos} setPagos={setPagos} mesKey={mesKey} />}
-        {tab === 5 && <CajaBancoTab costosFijos={costosFijos} pagos={pagos} mesKey={mesKey} caja={caja} setCaja={setCaja} banco={banco} setBanco={setBanco} pedidosPendientes={pedidos} setPedidosPendientes={setPedidos} ventasDiarias={ventasDiarias} setVentasDiarias={setVentasDiarias} registros={registros || []} setRegistros={setRegistros} />}
+        {tab === 5 && <ProveedoresTab proveedores={proveedores || []} setProveedores={setProveedores} pagosP={pagosP} setPagosP={setPagosP} mesKey={mesKey} />}
+        {tab === 6 && <CajaBancoTab costosFijos={costosFijos} pagos={pagos} proveedores={proveedores || []} pagosP={pagosP} mesKey={mesKey} caja={caja} setCaja={setCaja} banco={banco} setBanco={setBanco} pedidosPendientes={pedidos} setPedidosPendientes={setPedidos} ventasDiarias={ventasDiarias} setVentasDiarias={setVentasDiarias} registros={registros || []} setRegistros={setRegistros} />}
       </div>
     </div>
   );
