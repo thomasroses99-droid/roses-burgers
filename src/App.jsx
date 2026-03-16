@@ -990,7 +990,8 @@ function CajaDiariaTab({ cajaDiaria, setCajaDiaria }) {
   const [concepto, setConcepto] = useState("");
   const [ingreso, setIngreso] = useState("");
   const [egreso, setEgreso] = useState("");
-  const today = new Date().toLocaleDateString("es-AR");
+  const todayISO = new Date().toISOString().split("T")[0];
+  const [fecha, setFecha] = useState(todayISO);
 
   const movs = cajaDiaria || [];
 
@@ -1003,11 +1004,13 @@ function CajaDiariaTab({ cajaDiaria, setCajaDiaria }) {
   const totalIngresos = movs.reduce((s, m) => s + (Number(m.ingreso) || 0), 0);
   const totalEgresos = movs.reduce((s, m) => s + (Number(m.egreso) || 0), 0);
 
+  const fmtFecha = (iso) => { const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; };
+
   const add = () => {
     if (!concepto.trim() || (!ingreso && !egreso)) return;
     setCajaDiaria([...movs, {
       id: Date.now(),
-      fecha: today,
+      fecha: fmtFecha(fecha),
       concepto: concepto.trim(),
       ingreso: Number(ingreso) || 0,
       egreso: Number(egreso) || 0,
@@ -1029,7 +1032,11 @@ function CajaDiariaTab({ cajaDiaria, setCajaDiaria }) {
 
       <Card>
         <H title="Nuevo movimiento" />
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr 1fr auto", gap: "8px", alignItems: "end" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "140px 2fr 1fr 1fr auto", gap: "8px", alignItems: "end" }}>
+          <div>
+            <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>FECHA</div>
+            <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} style={{ ...IS, width: "100%" }} />
+          </div>
           <div>
             <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>CONCEPTO</div>
             <input
@@ -1113,16 +1120,18 @@ function CajaBancoTab({ costosFijos, pagos, proveedores, pagosP, mesKey, cajaDia
   const [concepto, setConcepto] = useState("");
   const [ingreso, setIngreso] = useState("");
   const [egreso, setEgreso] = useState("");
+  const todayISO = new Date().toISOString().split("T")[0];
+  const [fechaMov, setFechaMov] = useState(todayISO);
 
   const movs = cajaDiaria || [];
   let acum = 0;
   const movRows = movs.map(m => { acum += (Number(m.ingreso) || 0) - (Number(m.egreso) || 0); return { ...m, saldo: acum }; });
   const saldoCajaDiaria = movRows.length > 0 ? movRows[movRows.length - 1].saldo : 0;
-  const today = new Date().toLocaleDateString("es-AR");
+  const fmtFechaMov = (iso) => { const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; };
 
   const addMov = () => {
     if (!concepto.trim() || (!ingreso && !egreso)) return;
-    setCajaDiaria([...movs, { id: Date.now(), fecha: today, concepto: concepto.trim(), ingreso: Number(ingreso) || 0, egreso: Number(egreso) || 0 }]);
+    setCajaDiaria([...movs, { id: Date.now(), fecha: fmtFechaMov(fechaMov), concepto: concepto.trim(), ingreso: Number(ingreso) || 0, egreso: Number(egreso) || 0 }]);
     setConcepto(""); setIngreso(""); setEgreso("");
   };
 
@@ -1247,6 +1256,10 @@ function CajaBancoTab({ costosFijos, pagos, proveedores, pagosP, mesKey, cajaDia
         <Card>
           <H title="Nuevo movimiento" />
           <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+            <div>
+              <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "3px" }}>FECHA</div>
+              <input type="date" value={fechaMov} onChange={e => setFechaMov(e.target.value)} style={{ ...IS, width: "100%" }} />
+            </div>
             <div>
               <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "3px" }}>CONCEPTO</div>
               <input placeholder="Descripción..." value={concepto} onChange={e => setConcepto(e.target.value)} onKeyDown={e => e.key === "Enter" && addMov()} style={{ ...IS, width: "100%" }} />
