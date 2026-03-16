@@ -2,11 +2,23 @@ import { useState, useEffect, useCallback } from "react";
 
 // ===================== STORAGE =====================
 async function load(key, fallback) {
-  try { const r = await window.storage.get(key); return r ? JSON.parse(r.value) : fallback; }
-  catch { return fallback; }
+  try {
+    if (window.storage) {
+      const r = await window.storage.get(key);
+      return r ? JSON.parse(r.value) : fallback;
+    }
+    const r = localStorage.getItem(key);
+    return r ? JSON.parse(r) : fallback;
+  } catch { return fallback; }
 }
 async function save(key, value) {
-  try { await window.storage.set(key, JSON.stringify(value)); } catch {}
+  try {
+    if (window.storage) {
+      await window.storage.set(key, JSON.stringify(value));
+    } else {
+      localStorage.setItem(key, JSON.stringify(value));
+    }
+  } catch {}
 }
 function usePersisted(key, initial) {
   const [value, setValue] = useState(null);
@@ -1616,7 +1628,7 @@ export default function App() {
           <div style={{ color: "#6a9a7e", fontFamily: "'DM Mono', monospace", fontSize: "10px", textAlign: "right" }}>
             <div style={{ color: "#1a7a3a" }}>{mesActual.toUpperCase()}</div>
             <div>Día {hoy} de {diasDelMes()}</div>
-            <div style={{ color: "#2a6a3a", fontSize: "9px", marginTop: "1px" }}>💾 auto-guardado</div>
+            <div style={{ color: "#2a6a3a", fontSize: "9px", marginTop: "1px" }}>💾 guardado en este navegador</div>
           </div>
         </div>
       </div>
