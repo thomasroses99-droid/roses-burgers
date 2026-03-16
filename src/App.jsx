@@ -1247,7 +1247,7 @@ function CajaBancoTab({ costosFijos, pagos, proveedores, pagosP, mesKey, cajaDia
 
         {/* Saldo actual grande */}
         <div style={{ background: saldoCajaDiaria >= 0 ? "#1a7a3a" : "#cc4400", borderRadius: "11px", padding: "20px 18px", textAlign: "center" }}>
-          <div style={{ color: "rgba(255,255,255,0.7)", fontSize: "9px", letterSpacing: "0.15em", fontFamily: "'DM Mono', monospace", marginBottom: "6px", textTransform: "uppercase" }}>💵 Efectivo en caja — {today}</div>
+          <div style={{ color: "rgba(255,255,255,0.7)", fontSize: "9px", letterSpacing: "0.15em", fontFamily: "'DM Mono', monospace", marginBottom: "6px", textTransform: "uppercase" }}>💵 Efectivo en caja</div>
           <div style={{ color: "#ffffff", fontSize: "36px", fontWeight: "700", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>{fmt(saldoCajaDiaria)}</div>
           <div style={{ color: "rgba(255,255,255,0.6)", fontSize: "10px", fontFamily: "'DM Mono', monospace", marginTop: "6px" }}>{movs.length} movimiento{movs.length !== 1 ? "s" : ""}</div>
         </div>
