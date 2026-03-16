@@ -1224,14 +1224,19 @@ function StockTab({ insumos, ventas, burgers, salsas, stockInicial, setStockInic
 }
 
 // ===================== CAJA DIARIA =====================
-function CajaDiariaTab({ cajaDiaria, setCajaDiaria }) {
+function CajaDiariaTab({ cajaDiaria, setCajaDiaria, presets, setPresets }) {
+  const todayISO = new Date().toISOString().split("T")[0];
+  const [fecha, setFecha] = useState(todayISO);
   const [concepto, setConcepto] = useState("");
   const [ingreso, setIngreso] = useState("");
   const [egreso, setEgreso] = useState("");
-  const todayISO = new Date().toISOString().split("T")[0];
-  const [fecha, setFecha] = useState(todayISO);
+  const [nuevoPreset, setNuevoPreset] = useState("");
+  const [rDesde, setRDesde] = useState("");
+  const [rHasta, setRHasta] = useState("");
+  const [rConcepto, setRConcepto] = useState("");
 
   const movs = cajaDiaria || [];
+  const prs = presets || [];
 
   let acum = 0;
   const rows = movs.map(mov => {
@@ -1243,98 +1248,135 @@ function CajaDiariaTab({ cajaDiaria, setCajaDiaria }) {
   const totalEgresos = movs.reduce((s, m) => s + (Number(m.egreso) || 0), 0);
 
   const fmtFecha = (iso) => { const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; };
+  const parseDate = (str) => { try { const [d,m,y] = str.split("/"); return new Date(y, m-1, d); } catch { return null; } };
 
   const add = () => {
     if (!concepto.trim() || (!ingreso && !egreso)) return;
-    setCajaDiaria([...movs, {
-      id: Date.now(),
-      fecha: fmtFecha(fecha),
-      concepto: concepto.trim(),
-      ingreso: Number(ingreso) || 0,
-      egreso: Number(egreso) || 0,
-    }]);
-    setConcepto("");
-    setIngreso("");
-    setEgreso("");
+    setCajaDiaria([...movs, { id: Date.now(), fecha: fmtFecha(fecha), concepto: concepto.trim(), ingreso: Number(ingreso) || 0, egreso: Number(egreso) || 0 }]);
+    setConcepto(""); setIngreso(""); setEgreso("");
   };
 
-  const remove = (id) => setCajaDiaria(movs.filter(m => m.id !== id));
+  const addPreset = () => {
+    if (!nuevoPreset.trim()) return;
+    setPresets([...prs, { id: Date.now(), nombre: nuevoPreset.trim() }]);
+    setNuevoPreset("");
+  };
+
+  // Filtro para reporte
+  const desdeDate = rDesde ? new Date(rDesde) : null;
+  const hastaDate = rHasta ? new Date(new Date(rHasta).setHours(23,59,59)) : null;
+  const movsFiltrados = movs.filter(m => {
+    const d = parseDate(m.fecha);
+    if (!d) return false;
+    if (desdeDate && d < desdeDate) return false;
+    if (hastaDate && d > hastaDate) return false;
+    if (rConcepto && m.concepto !== rConcepto) return false;
+    return true;
+  });
+
+  // Agrupar por concepto para el reporte
+  const porConcepto = {};
+  for (const m of movsFiltrados) {
+    if (!porConcepto[m.concepto]) porConcepto[m.concepto] = { ingreso: 0, egreso: 0 };
+    porConcepto[m.concepto].ingreso += Number(m.ingreso) || 0;
+    porConcepto[m.concepto].egreso += Number(m.egreso) || 0;
+  }
+  const reporteFilas = Object.entries(porConcepto).map(([c, v]) => ({ concepto: c, ...v, saldo: v.ingreso - v.egreso }));
+  const reporteTotalIng = reporteFilas.reduce((s, r) => s + r.ingreso, 0);
+  const reporteTotalEgr = reporteFilas.reduce((s, r) => s + r.egreso, 0);
+
+  // Todos los conceptos usados (para el filtro)
+  const conceptosUsados = [...new Set(movs.map(m => m.concepto))].sort();
+
+  const mono = "'DM Mono', monospace";
+  const chipStyle = (active) => ({ display: "inline-flex", alignItems: "center", gap: "5px", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontFamily: mono, cursor: "pointer", border: `1px solid ${active ? "#1a7a3a" : "#c8e6c9"}`, background: active ? "#1a7a3a" : "#f0faf4", color: active ? "#fff" : "#2a5a3a", transition: "all 0.1s" });
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+
+      {/* ── Resumen ── */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "9px" }}>
-        <StatBox label="Efectivo disponible" value={fmt(saldoFinal)} accent={saldoFinal >= 0} warn={saldoFinal < 0} sub="Actualiza solapa Caja" />
+        <StatBox label="Efectivo disponible" value={fmt(saldoFinal)} accent={saldoFinal >= 0} warn={saldoFinal < 0} sub="Alimenta solapa Caja" />
         <StatBox label="Total ingresos" value={fmt(totalIngresos)} accent />
         <StatBox label="Total egresos" value={fmt(totalEgresos)} warn={totalEgresos > 0} />
       </div>
 
+      {/* ── Conceptos predefinidos ── */}
+      <Card>
+        <H title="Conceptos habituales">
+          <div style={{ display: "flex", gap: "6px" }}>
+            <input placeholder="Nuevo concepto..." value={nuevoPreset} onChange={e => setNuevoPreset(e.target.value)} onKeyDown={e => e.key === "Enter" && addPreset()} style={{ ...IS, fontSize: "11px", padding: "5px 9px" }} />
+            <Btn onClick={addPreset}>+ Guardar</Btn>
+          </div>
+        </H>
+        {prs.length > 0 ? (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+            {prs.map(p => (
+              <div key={p.id} style={{ display: "flex", alignItems: "center", gap: "2px" }}>
+                <span onClick={() => setConcepto(p.nombre)} style={chipStyle(concepto === p.nombre)}>{p.nombre}</span>
+                <button onClick={() => setPresets(prs.filter(x => x.id !== p.id))} style={{ background: "none", border: "none", color: "#c8a0a0", cursor: "pointer", fontSize: "12px", padding: "0 2px", lineHeight: 1 }}>✕</button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ color: "#8aba9e", fontSize: "11px", fontFamily: mono }}>Guardá conceptos frecuentes para seleccionarlos rápido (ej: "Venta efectivo", "Pago proveedor")</div>
+        )}
+      </Card>
+
+      {/* ── Nuevo movimiento ── */}
       <Card>
         <H title="Nuevo movimiento" />
         <div style={{ display: "grid", gridTemplateColumns: "140px 2fr 1fr 1fr auto", gap: "8px", alignItems: "end" }}>
           <div>
-            <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>FECHA</div>
+            <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: mono, marginBottom: "4px" }}>FECHA</div>
             <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} style={{ ...IS, width: "100%" }} />
           </div>
           <div>
-            <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>CONCEPTO</div>
-            <input
-              placeholder="Descripción del movimiento..."
-              value={concepto}
-              onChange={e => setConcepto(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && add()}
-              style={{ ...IS, width: "100%" }}
-            />
+            <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: mono, marginBottom: "4px" }}>CONCEPTO</div>
+            <input placeholder="Descripción o seleccioná arriba..." value={concepto} onChange={e => setConcepto(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} style={{ ...IS, width: "100%" }} />
           </div>
           <div>
-            <div style={{ color: "#1a7a3a", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>INGRESO $</div>
+            <div style={{ color: "#1a7a3a", fontSize: "9px", fontFamily: mono, marginBottom: "4px" }}>↑ INGRESO $</div>
             <input type="number" placeholder="0" value={ingreso} onChange={e => setIngreso(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} style={{ ...IS, width: "100%" }} />
           </div>
           <div>
-            <div style={{ color: "#cc4400", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>EGRESO $</div>
+            <div style={{ color: "#cc4400", fontSize: "9px", fontFamily: mono, marginBottom: "4px" }}>↓ EGRESO $</div>
             <input type="number" placeholder="0" value={egreso} onChange={e => setEgreso(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} style={{ ...IS, width: "100%" }} />
           </div>
           <Btn onClick={add}>+ Agregar</Btn>
         </div>
       </Card>
 
+      {/* ── Tabla de movimientos ── */}
       <Card>
         <H title="Movimientos registrados">
-          {movs.length > 0 && (
-            <Btn variant="secondary" onClick={() => { if (window.confirm("¿Borrar todos los movimientos?")) setCajaDiaria([]); }}>Limpiar todo</Btn>
-          )}
+          {movs.length > 0 && <Btn variant="secondary" onClick={() => { if (window.confirm("¿Borrar todos los movimientos?")) setCajaDiaria([]); }}>Limpiar todo</Btn>}
         </H>
         {rows.length > 0 ? (
           <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'DM Mono', monospace", fontSize: "12px" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: mono, fontSize: "12px" }}>
               <thead>
                 <tr style={{ borderBottom: "2px solid #c8e6d0" }}>
-                  {[
-                    { label: "Fecha", align: "left" },
-                    { label: "Concepto", align: "left" },
-                    { label: "Ingreso", align: "right" },
-                    { label: "Egreso", align: "right" },
-                    { label: "Saldo", align: "right" },
-                    { label: "", align: "center" },
-                  ].map(col => (
-                    <th key={col.label} style={{ padding: "8px 10px", color: "#5a8a6e", fontWeight: "700", fontSize: "9px", letterSpacing: "0.1em", textAlign: col.align, textTransform: "uppercase" }}>{col.label}</th>
+                  {[{l:"Fecha",a:"left"},{l:"Concepto",a:"left"},{l:"Ingreso",a:"right"},{l:"Egreso",a:"right"},{l:"Saldo",a:"right"},{l:"",a:"center"}].map(c => (
+                    <th key={c.l} style={{ padding: "8px 10px", color: "#5a8a6e", fontWeight: "700", fontSize: "9px", letterSpacing: "0.1em", textAlign: c.a, textTransform: "uppercase" }}>{c.l}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {rows.map((r, i) => (
-                  <tr key={r.id} style={{ borderBottom: "1px solid #e8f5ec", background: i % 2 === 0 ? "#fafffe" : "#ffffff" }}>
+                  <tr key={r.id} style={{ borderBottom: "1px solid #e8f5ec", background: i % 2 === 0 ? "#fafffe" : "#fff" }}>
                     <td style={{ padding: "9px 10px", color: "#5a8a6e", fontSize: "10px", whiteSpace: "nowrap" }}>{r.fecha}</td>
                     <td style={{ padding: "9px 10px", color: "#1a3a25" }}>{r.concepto}</td>
                     <td style={{ padding: "9px 10px", textAlign: "right", color: r.ingreso > 0 ? "#1a7a3a" : "#bbb", fontWeight: r.ingreso > 0 ? "700" : "400" }}>{r.ingreso > 0 ? fmt(r.ingreso) : "—"}</td>
                     <td style={{ padding: "9px 10px", textAlign: "right", color: r.egreso > 0 ? "#cc4400" : "#bbb", fontWeight: r.egreso > 0 ? "700" : "400" }}>{r.egreso > 0 ? fmt(r.egreso) : "—"}</td>
                     <td style={{ padding: "9px 10px", textAlign: "right", color: r.saldo >= 0 ? "#1a5c2a" : "#cc4400", fontWeight: "700" }}>{fmt(r.saldo)}</td>
-                    <td style={{ padding: "9px 4px", textAlign: "center" }}><X onClick={() => remove(r.id)} /></td>
+                    <td style={{ padding: "9px 4px", textAlign: "center" }}><X onClick={() => setCajaDiaria(movs.filter(m => m.id !== r.id))} /></td>
                   </tr>
                 ))}
               </tbody>
               <tfoot>
                 <tr style={{ borderTop: "2px solid #c8e6d0" }}>
-                  <td colSpan={2} style={{ padding: "10px", color: "#5a8a6e", fontFamily: "'DM Mono', monospace", fontSize: "11px", fontWeight: "700" }}>SALDO FINAL</td>
+                  <td colSpan={2} style={{ padding: "10px", color: "#5a8a6e", fontFamily: mono, fontSize: "11px", fontWeight: "700" }}>SALDO FINAL</td>
                   <td style={{ padding: "10px", textAlign: "right", color: "#1a7a3a", fontWeight: "700", fontSize: "13px" }}>{fmt(totalIngresos)}</td>
                   <td style={{ padding: "10px", textAlign: "right", color: "#cc4400", fontWeight: "700", fontSize: "13px" }}>{fmt(totalEgresos)}</td>
                   <td style={{ padding: "10px", textAlign: "right", color: saldoFinal >= 0 ? "#1a7a3a" : "#cc4400", fontWeight: "700", fontSize: "15px" }}>{fmt(saldoFinal)}</td>
@@ -1344,11 +1386,85 @@ function CajaDiariaTab({ cajaDiaria, setCajaDiaria }) {
             </table>
           </div>
         ) : (
-          <div style={{ textAlign: "center", padding: "32px", color: "#8aba9e", fontFamily: "'DM Mono', monospace", fontSize: "11px" }}>
+          <div style={{ textAlign: "center", padding: "32px", color: "#8aba9e", fontFamily: mono, fontSize: "11px" }}>
             No hay movimientos registrados.<br />Agregá un ingreso o egreso para comenzar.
           </div>
         )}
       </Card>
+
+      {/* ── Reporte por período ── */}
+      <Card style={{ border: "1px solid #b8d8c8" }}>
+        <H title="Reporte por período" />
+
+        {/* Filtros */}
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "16px" }}>
+          <div>
+            <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: mono, marginBottom: "4px" }}>DESDE</div>
+            <input type="date" value={rDesde} onChange={e => setRDesde(e.target.value)} style={{ ...IS, width: "100%" }} />
+          </div>
+          <div>
+            <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: mono, marginBottom: "4px" }}>HASTA</div>
+            <input type="date" value={rHasta} onChange={e => setRHasta(e.target.value)} style={{ ...IS, width: "100%" }} />
+          </div>
+          <div>
+            <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: mono, marginBottom: "4px" }}>CONCEPTO (opcional)</div>
+            <select value={rConcepto} onChange={e => setRConcepto(e.target.value)} style={{ ...IS, width: "100%" }}>
+              <option value="">Todos los conceptos</option>
+              {conceptosUsados.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: "8px", marginBottom: "16px", flexWrap: "wrap" }}>
+          <Btn variant="secondary" style={{ fontSize: "10px" }} onClick={() => { const h = new Date(); const d = new Date(); d.setDate(1); setRDesde(d.toISOString().split("T")[0]); setRHasta(h.toISOString().split("T")[0]); }}>Este mes</Btn>
+          <Btn variant="secondary" style={{ fontSize: "10px" }} onClick={() => { const h = new Date(); const d = new Date(); d.setDate(h.getDate() - 6); setRDesde(d.toISOString().split("T")[0]); setRHasta(h.toISOString().split("T")[0]); }}>Últimos 7 días</Btn>
+          <Btn variant="secondary" style={{ fontSize: "10px" }} onClick={() => { setRDesde(""); setRHasta(""); setRConcepto(""); }}>Limpiar filtro</Btn>
+        </div>
+
+        {movsFiltrados.length > 0 ? (
+          <>
+            {/* Resumen del período */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "9px", marginBottom: "14px" }}>
+              <StatBox label="Ingresos período" value={fmt(reporteTotalIng)} accent />
+              <StatBox label="Egresos período" value={fmt(reporteTotalEgr)} warn={reporteTotalEgr > 0} />
+              <StatBox label="Saldo período" value={fmt(reporteTotalIng - reporteTotalEgr)} accent={reporteTotalIng >= reporteTotalEgr} warn={reporteTotalIng < reporteTotalEgr} />
+            </div>
+
+            {/* Tabla por concepto */}
+            <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: mono, fontSize: "12px" }}>
+              <thead>
+                <tr style={{ borderBottom: "2px solid #c8e6d0" }}>
+                  {[{l:"Concepto",a:"left"},{l:"Ingresos",a:"right"},{l:"Egresos",a:"right"},{l:"Saldo",a:"right"}].map(c => (
+                    <th key={c.l} style={{ padding: "8px 10px", color: "#5a8a6e", fontSize: "9px", letterSpacing: "0.1em", textAlign: c.a, textTransform: "uppercase", fontWeight: "700" }}>{c.l}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {reporteFilas.sort((a,b) => b.saldo - a.saldo).map((r, i) => (
+                  <tr key={r.concepto} style={{ borderBottom: "1px solid #e8f5ec", background: i % 2 === 0 ? "#fafffe" : "#fff" }}>
+                    <td style={{ padding: "9px 10px", color: "#1a3a25", fontWeight: "600" }}>{r.concepto}</td>
+                    <td style={{ padding: "9px 10px", textAlign: "right", color: r.ingreso > 0 ? "#1a7a3a" : "#bbb", fontWeight: r.ingreso > 0 ? "700" : "400" }}>{r.ingreso > 0 ? fmt(r.ingreso) : "—"}</td>
+                    <td style={{ padding: "9px 10px", textAlign: "right", color: r.egreso > 0 ? "#cc4400" : "#bbb", fontWeight: r.egreso > 0 ? "700" : "400" }}>{r.egreso > 0 ? fmt(r.egreso) : "—"}</td>
+                    <td style={{ padding: "9px 10px", textAlign: "right", color: r.saldo >= 0 ? "#1a5c2a" : "#cc4400", fontWeight: "700" }}>{fmt(r.saldo)}</td>
+                  </tr>
+                ))}
+              </tbody>
+              <tfoot>
+                <tr style={{ borderTop: "2px solid #c8e6d0" }}>
+                  <td style={{ padding: "10px", color: "#5a8a6e", fontFamily: mono, fontSize: "11px", fontWeight: "700" }}>TOTAL PERÍODO ({movsFiltrados.length} movimientos)</td>
+                  <td style={{ padding: "10px", textAlign: "right", color: "#1a7a3a", fontWeight: "700", fontSize: "13px" }}>{fmt(reporteTotalIng)}</td>
+                  <td style={{ padding: "10px", textAlign: "right", color: "#cc4400", fontWeight: "700", fontSize: "13px" }}>{fmt(reporteTotalEgr)}</td>
+                  <td style={{ padding: "10px", textAlign: "right", color: reporteTotalIng >= reporteTotalEgr ? "#1a7a3a" : "#cc4400", fontWeight: "700", fontSize: "15px" }}>{fmt(reporteTotalIng - reporteTotalEgr)}</td>
+                </tr>
+              </tfoot>
+            </table>
+          </>
+        ) : (
+          <div style={{ textAlign: "center", padding: "28px", color: "#8aba9e", fontFamily: mono, fontSize: "11px" }}>
+            {movs.length === 0 ? "No hay movimientos cargados aún." : "No hay movimientos en el período seleccionado."}
+          </div>
+        )}
+      </Card>
+
     </div>
   );
 }
@@ -1562,6 +1678,7 @@ const KEYS = {
   caja: "hb-caja", banco: "hb-banco", pedidos: "hb-pedidos",
   ventasDiarias: "hb-ventas-diarias", registros: "hb-registros",
   cajaDiaria: "hb-caja-diaria",
+  cajaPresets: "hb-caja-presets",
   stockInicial: "hb-stock-inicial",
   ventasReg: "hb-ventas-reg",
 };
@@ -1581,11 +1698,12 @@ export default function App() {
   const [ventasDiarias, setVentasDiarias, r8] = usePersisted(KEYS.ventasDiarias, "");
   const [registros, setRegistros, r9] = usePersisted(KEYS.registros, []);
   const [cajaDiaria, setCajaDiaria, r10] = usePersisted(KEYS.cajaDiaria, []);
+  const [cajaPresets, setCajaPresets, r13] = usePersisted(KEYS.cajaPresets, []);
   const [stockInicial, setStockInicial, r11] = usePersisted(KEYS.stockInicial, {});
   const [ventasReg, setVentasReg, r12] = usePersisted(KEYS.ventasReg, []);
   const mesKey = `${new Date().getFullYear()}-${new Date().getMonth()}`;
 
-  if (![r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,rp0,rp1].every(Boolean)) return (
+  if (![r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,rp0,rp1].every(Boolean)) return (
     <div style={{ minHeight: "100vh", background: "#f0f7f2", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "12px" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;700&display=swap');`}</style>
       <div style={{ fontSize: "28px" }}>🍔</div>
@@ -1646,7 +1764,7 @@ export default function App() {
         {tab === 5 && <ProveedoresTab proveedores={proveedores || []} setProveedores={setProveedores} pagosP={pagosP} setPagosP={setPagosP} mesKey={mesKey} />}
         {tab === 6 && <VentasTab ventas={ventasReg} setVentas={setVentasReg} burgers={burgers} insumos={insumos} salsas={salsas} />}
         {tab === 7 && <StockTab insumos={insumos} ventas={ventasReg} burgers={burgers} salsas={salsas} stockInicial={stockInicial} setStockInicial={setStockInicial} />}
-        {tab === 8 && <CajaDiariaTab cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} />}
+        {tab === 8 && <CajaDiariaTab cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} presets={cajaPresets || []} setPresets={setCajaPresets} />}
         {tab === 9 && <CajaBancoTab costosFijos={costosFijos} pagos={pagos} proveedores={proveedores || []} pagosP={pagosP} mesKey={mesKey} cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} banco={banco} setBanco={setBanco} pedidosPendientes={pedidos} setPedidosPendientes={setPedidos} ventasDiarias={ventasDiarias} setVentasDiarias={setVentasDiarias} registros={registros || []} setRegistros={setRegistros} />}
       </div>
     </div>
