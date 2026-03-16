@@ -20,38 +20,189 @@ function usePersisted(key, initial) {
 
 // ===================== INITIAL DATA =====================
 const initialInsumos = [
+  // Carnes
   { id: 1, nombre: "Carne picada", unidad: "kg", precio_unidad: 4000, categoria: "Carnes" },
-  { id: 2, nombre: "Pan brioche", unidad: "unidad", precio_unidad: 250, categoria: "Panificados" },
-  { id: 3, nombre: "Queso cheddar", unidad: "kg", precio_unidad: 3200, categoria: "Lácteos" },
   { id: 4, nombre: "Bacon", unidad: "kg", precio_unidad: 5500, categoria: "Carnes" },
+  { id: 30, nombre: "Panceta", unidad: "kg", precio_unidad: 5000, categoria: "Carnes" },
+  // Panificados
+  { id: 2, nombre: "Pan brioche", unidad: "unidad", precio_unidad: 250, categoria: "Panificados" },
+  // Lacteos
+  { id: 3, nombre: "Queso cheddar", unidad: "kg", precio_unidad: 3200, categoria: "Lácteos" },
+  { id: 20, nombre: "Leche", unidad: "kg", precio_unidad: 600, categoria: "Lácteos" },
+  { id: 21, nombre: "Crema de leche", unidad: "kg", precio_unidad: 1800, categoria: "Lácteos" },
+  { id: 22, nombre: "Manteca", unidad: "kg", precio_unidad: 4000, categoria: "Lácteos" },
+  { id: 23, nombre: "Casan Crem", unidad: "kg", precio_unidad: 2500, categoria: "Lácteos" },
+  // Verduras
   { id: 5, nombre: "Lechuga", unidad: "kg", precio_unidad: 800, categoria: "Verduras" },
   { id: 6, nombre: "Tomate", unidad: "kg", precio_unidad: 900, categoria: "Verduras" },
   { id: 7, nombre: "Cebolla", unidad: "kg", precio_unidad: 500, categoria: "Verduras" },
-  { id: 8, nombre: "Pepinillos", unidad: "kg", precio_unidad: 1800, categoria: "Varios" },
+  { id: 12, nombre: "Ajo", unidad: "kg", precio_unidad: 2000, categoria: "Verduras" },
+  { id: 24, nombre: "Ajo picado", unidad: "kg", precio_unidad: 2200, categoria: "Verduras" },
+  { id: 25, nombre: "Perejil", unidad: "kg", precio_unidad: 800, categoria: "Verduras" },
+  { id: 26, nombre: "Ciboulette", unidad: "kg", precio_unidad: 1200, categoria: "Verduras" },
+  { id: 27, nombre: "Cebolla picada", unidad: "kg", precio_unidad: 500, categoria: "Verduras" },
+  // Salsas base
   { id: 9, nombre: "Mayonesa", unidad: "kg", precio_unidad: 1200, categoria: "Salsas base" },
   { id: 10, nombre: "Ketchup", unidad: "kg", precio_unidad: 900, categoria: "Salsas base" },
   { id: 11, nombre: "Mostaza", unidad: "kg", precio_unidad: 850, categoria: "Salsas base" },
-  { id: 12, nombre: "Ajo", unidad: "kg", precio_unidad: 2000, categoria: "Verduras" },
+  { id: 15, nombre: "Mostaza de Dijon", unidad: "kg", precio_unidad: 2200, categoria: "Salsas base" },
+  { id: 14, nombre: "Barbacoa", unidad: "kg", precio_unidad: 1100, categoria: "Salsas base" },
+  { id: 16, nombre: "Salsa Inglesa", unidad: "kg", precio_unidad: 1800, categoria: "Salsas base" },
+  { id: 17, nombre: "Relish", unidad: "kg", precio_unidad: 2000, categoria: "Salsas base" },
+  // Especias y condimentos
   { id: 13, nombre: "Pimentón ahumado", unidad: "kg", precio_unidad: 3500, categoria: "Especias" },
-  { id: 14, nombre: "Salsa BBQ industrial", unidad: "kg", precio_unidad: 1100, categoria: "Salsas base" },
+  { id: 18, nombre: "Pimienta", unidad: "kg", precio_unidad: 4000, categoria: "Especias" },
+  { id: 28, nombre: "Aji Molido", unidad: "kg", precio_unidad: 3000, categoria: "Especias" },
+  { id: 29, nombre: "Ajo en polvo", unidad: "kg", precio_unidad: 5000, categoria: "Especias" },
+  { id: 31, nombre: "Polvo sabor carne", unidad: "kg", precio_unidad: 6000, categoria: "Especias" },
+  { id: 32, nombre: "Sal", unidad: "kg", precio_unidad: 300, categoria: "Especias" },
+  // Varios
+  { id: 8, nombre: "Pepinillos", unidad: "kg", precio_unidad: 1800, categoria: "Varios" },
+  { id: 19, nombre: "Aceite", unidad: "kg", precio_unidad: 1500, categoria: "Varios" },
+  { id: 33, nombre: "Vinagre", unidad: "kg", precio_unidad: 800, categoria: "Varios" },
+  { id: 34, nombre: "Azucar", unidad: "kg", precio_unidad: 600, categoria: "Varios" },
+  { id: 35, nombre: "Miel", unidad: "kg", precio_unidad: 3500, categoria: "Varios" },
+  { id: 36, nombre: "Humo liquido", unidad: "kg", precio_unidad: 8000, categoria: "Varios" },
+  { id: 37, nombre: "Jugo de limon", unidad: "kg", precio_unidad: 1200, categoria: "Varios" },
 ];
 
 const initialSalsas = [
   {
-    id: 1, nombre: "Salsa especial", rendimiento_porciones: 20,
+    id: 1, nombre: "Salsa Stacker", rendimiento_porciones: 20,
     ingredientes: [
-      { insumo_id: 9, cantidad: 0.5 },
-      { insumo_id: 10, cantidad: 0.15 },
-      { insumo_id: 11, cantidad: 0.05 },
-      { insumo_id: 12, cantidad: 0.02 },
+      { insumo_id: 9, cantidad: 0.3 },    // Mayonesa 300g
+      { insumo_id: 10, cantidad: 0.03 },   // Ketchup 30g
+      { insumo_id: 17, cantidad: 0.04 },   // Relish 40g
+      { insumo_id: 33, cantidad: 0.04 },   // Vinagre 40g
+      { insumo_id: 34, cantidad: 0.005 },  // Azucar 5g
+      { insumo_id: 13, cantidad: 0.005 },  // Pimentón ahumado 5g
+      { insumo_id: 18, cantidad: 0.0005 }, // Pimienta 0.5g
+      { insumo_id: 31, cantidad: 0.003 },  // Polvo sabor carne 3g
+      { insumo_id: 36, cantidad: 0.005 },  // Humo liquido 5g
     ]
   },
   {
-    id: 2, nombre: "BBQ casera", rendimiento_porciones: 15,
+    id: 2, nombre: "Salsa Cheese", rendimiento_porciones: 20,
     ingredientes: [
-      { insumo_id: 14, cantidad: 0.3 },
-      { insumo_id: 10, cantidad: 0.1 },
-      { insumo_id: 13, cantidad: 0.01 },
+      { insumo_id: 20, cantidad: 0.1 },    // Leche 100g
+      { insumo_id: 15, cantidad: 0.01 },   // Mostaza de Dijon 10g
+      { insumo_id: 10, cantidad: 0.01 },   // Ketchup 10g
+      { insumo_id: 22, cantidad: 0.1 },    // Manteca 100g
+      { insumo_id: 19, cantidad: 0.1 },    // Aceite 100g
+      { insumo_id: 32, cantidad: 0.001 },  // Sal 1g
+      { insumo_id: 29, cantidad: 0.001 },  // Ajo en polvo 1g
+      { insumo_id: 18, cantidad: 0.0005 }, // Pimienta 0.5g
+      { insumo_id: 31, cantidad: 0.003 },  // Polvo sabor carne 3g
+      { insumo_id: 33, cantidad: 0.015 },  // Vinagre 15g
+    ]
+  },
+  {
+    id: 3, nombre: "Salsa Classic", rendimiento_porciones: 20,
+    ingredientes: [
+      { insumo_id: 21, cantidad: 0.1 },    // Crema de leche 100g
+      { insumo_id: 9, cantidad: 0.2 },     // Mayonesa 200g
+      { insumo_id: 33, cantidad: 0.02 },   // Vinagre 20g
+      { insumo_id: 15, cantidad: 0.005 },  // Mostaza de Dijon 5g
+      { insumo_id: 35, cantidad: 0.015 },  // Miel 15g
+      { insumo_id: 18, cantidad: 0.0005 }, // Pimienta 0.5g
+      { insumo_id: 32, cantidad: 0.001 },  // Sal 1g
+      { insumo_id: 13, cantidad: 0.001 },  // Pimentón ahumado 1g
+      { insumo_id: 31, cantidad: 0.003 },  // Polvo sabor carne 3g
+    ]
+  },
+  {
+    id: 4, nombre: "Salsa Cowboy", rendimiento_porciones: 25,
+    ingredientes: [
+      { insumo_id: 22, cantidad: 0.24 },   // Manteca 240g
+      { insumo_id: 25, cantidad: 0.01 },   // Perejil 10g
+      { insumo_id: 26, cantidad: 0.01 },   // Ciboulette 10g
+      { insumo_id: 12, cantidad: 0.006 },  // Ajo (diente) 6g
+      { insumo_id: 33, cantidad: 0.03 },   // Vinagre 30g
+      { insumo_id: 13, cantidad: 0.005 },  // Pimentón 5g
+      { insumo_id: 18, cantidad: 0.001 },  // Pimienta 1g
+      { insumo_id: 28, cantidad: 0.005 },  // Ají Molido 5g
+      { insumo_id: 16, cantidad: 0.015 },  // Salsa Inglesa 15g
+      { insumo_id: 15, cantidad: 0.01 },   // Mostaza de Dijon 10g
+      { insumo_id: 23, cantidad: 0.2 },    // Casan Crem 200g
+      { insumo_id: 35, cantidad: 0.01 },   // Miel 10g
+      { insumo_id: 19, cantidad: 0.1 },    // Aceite 100g
+      { insumo_id: 20, cantidad: 0.05 },   // Leche 50g
+    ]
+  },
+  {
+    id: 5, nombre: "Salsa Smokey", rendimiento_porciones: 15,
+    ingredientes: [
+      { insumo_id: 14, cantidad: 0.24 },   // Barbacoa 240g
+      { insumo_id: 35, cantidad: 0.08 },   // Miel 80g
+      { insumo_id: 29, cantidad: 0.005 },  // Ajo en polvo 5g
+      { insumo_id: 36, cantidad: 0.005 },  // Humo Liquido 5g
+      { insumo_id: 18, cantidad: 0.005 },  // Pimienta 5g
+      { insumo_id: 13, cantidad: 0.005 },  // Pimentón 5g
+    ]
+  },
+  {
+    id: 6, nombre: "Salsa 1967", rendimiento_porciones: 25,
+    ingredientes: [
+      { insumo_id: 9, cantidad: 0.48 },    // Mayonesa 480g
+      { insumo_id: 11, cantidad: 0.03 },   // Mostaza 30g
+      { insumo_id: 10, cantidad: 0.12 },   // Ketchup 120g
+      { insumo_id: 34, cantidad: 0.03 },   // Azucar 30g
+      { insumo_id: 33, cantidad: 0.03 },   // Vinagre 30g
+      { insumo_id: 17, cantidad: 0.045 },  // Relish 45g
+    ]
+  },
+  {
+    id: 7, nombre: "Salsa Cheesebacon", rendimiento_porciones: 20,
+    ingredientes: [
+      { insumo_id: 19, cantidad: 0.3 },    // Aceite 300g
+      { insumo_id: 30, cantidad: 0.2 },    // Panceta 200g
+      { insumo_id: 20, cantidad: 0.15 },   // Leche 150g
+      { insumo_id: 15, cantidad: 0.015 },  // Mostaza de Dijon 15g
+      { insumo_id: 33, cantidad: 0.015 },  // Vinagre 15g
+      { insumo_id: 18, cantidad: 0.0005 }, // Pimienta 0.5g
+      { insumo_id: 31, cantidad: 0.003 },  // Polvo de carne 3g
+      { insumo_id: 35, cantidad: 0.01 },   // Miel 10g
+      { insumo_id: 36, cantidad: 0.002 },  // Humo liquido 2g
+      { insumo_id: 26, cantidad: 0.015 },  // Ciboulette 15g
+    ]
+  },
+  {
+    id: 8, nombre: "Salsa Ruby y Crispy Garlic", rendimiento_porciones: 20,
+    ingredientes: [
+      { insumo_id: 19, cantidad: 0.2 },    // Aceite 200g
+      { insumo_id: 20, cantidad: 0.199 },  // Leche 199g
+      { insumo_id: 33, cantidad: 0.015 },  // Vinagre 15g
+      { insumo_id: 15, cantidad: 0.015 },  // Mostaza de Dijon 15g
+      { insumo_id: 32, cantidad: 0.001 },  // Sal 1g
+      { insumo_id: 18, cantidad: 0.0005 }, // Pimienta 0.5g
+      { insumo_id: 24, cantidad: 0.005 },  // Ajo picado 5g
+      { insumo_id: 31, cantidad: 0.003 },  // Polvo de carne 3g
+    ]
+  },
+  {
+    id: 9, nombre: "Salsa Blue", rendimiento_porciones: 20,
+    ingredientes: [
+      { insumo_id: 9, cantidad: 0.24 },    // Mayonesa 240g
+      { insumo_id: 15, cantidad: 0.06 },   // Mostaza de Dijon 60g
+      { insumo_id: 11, cantidad: 0.06 },   // Mostaza 60g
+      { insumo_id: 35, cantidad: 0.12 },   // Miel 120g
+      { insumo_id: 18, cantidad: 0.0005 }, // Pimienta 0.5g
+      { insumo_id: 28, cantidad: 0.003 },  // Aji molido 3g
+      { insumo_id: 29, cantidad: 0.001 },  // Ajo en polvo 1g
+      { insumo_id: 31, cantidad: 0.003 },  // Polvo de carne 3g
+    ]
+  },
+  {
+    id: 10, nombre: "Salsa Biggie", rendimiento_porciones: 25,
+    ingredientes: [
+      { insumo_id: 9, cantidad: 0.52 },    // Mayonesa 520g
+      { insumo_id: 15, cantidad: 0.045 },  // Mostaza de Dijon 45g
+      { insumo_id: 29, cantidad: 0.001 },  // Ajo en polvo 1g
+      { insumo_id: 27, cantidad: 0.015 },  // Cebolla picada 15g
+      { insumo_id: 18, cantidad: 0.0005 }, // Pimienta 0.5g
+      { insumo_id: 13, cantidad: 0.001 },  // Pimentón ahumado 1g
+      { insumo_id: 31, cantidad: 0.003 },  // Polvo de carne 3g
+      { insumo_id: 37, cantidad: 0.015 },  // Jugo de limon 15g
     ]
   },
 ];
