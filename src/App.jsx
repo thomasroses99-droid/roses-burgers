@@ -1060,7 +1060,7 @@ function CajaDiariaTab({ cajaDiaria, setCajaDiaria }) {
       </Card>
 
       <Card>
-        <H title={`Movimientos — ${today}`}>
+        <H title="Movimientos registrados">
           {movs.length > 0 && (
             <Btn variant="secondary" onClick={() => { if (window.confirm("¿Borrar todos los movimientos?")) setCajaDiaria([]); }}>Limpiar todo</Btn>
           )}
