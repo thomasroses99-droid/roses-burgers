@@ -921,7 +921,7 @@ function CostosFijosTab({ costosFijos, setCostosFijos, pagos, setPagos, mesKey }
             return (
               <div key={c.id} style={{ display: "flex", alignItems: "center", gap: "9px", padding: "7px 0", borderTop: "1px solid #f0f7f3" }}>
                 <button onClick={() => tog(c.id)} style={{ width: "24px", height: "24px", borderRadius: "50%", background: p ? "#4CAF50" : "#111", border: `2px solid ${p ? "#4CAF50" : "#222"}`, color: p ? "#fff" : "#333", cursor: "pointer", fontSize: "11px", flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}>{p ? "✓" : "○"}</button>
-                <input value={c.nombre} onChange={e => upd(c.id, "nombre", e.target.value)} style={{ ...IS, flex: 1, color: p ? "#333" : "#ccc", textDecoration: p ? "line-through" : "none" }} />
+                <input value={c.nombre} onChange={e => upd(c.id, "nombre", e.target.value)} style={{ ...IS, flex: 1, color: p ? "#888" : "#1a2e1a", textDecoration: p ? "line-through" : "none" }} />
                 <input type="number" value={c.monto} onChange={e => upd(c.id, "monto", e.target.value)} style={{ ...IS, width: "115px", color: p ? "#333" : "#1a7a3a", fontWeight: "700" }} />
                 <X onClick={() => del(c.id)} />
               </div>
