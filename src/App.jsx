@@ -1,33 +1,25 @@
 import { useState, useEffect, useCallback } from "react";
 
 // ===================== STORAGE =====================
-async function load(key, fallback) {
+function lsLoad(key, fallback) {
   try {
-    if (window.storage) {
-      const r = await window.storage.get(key);
-      return r ? JSON.parse(r.value) : fallback;
-    }
     const r = localStorage.getItem(key);
-    return r ? JSON.parse(r) : fallback;
+    return r !== null ? JSON.parse(r) : fallback;
   } catch { return fallback; }
 }
-async function save(key, value) {
-  try {
-    if (window.storage) {
-      await window.storage.set(key, JSON.stringify(value));
-    } else {
-      localStorage.setItem(key, JSON.stringify(value));
-    }
-  } catch {}
+function lsSave(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 function usePersisted(key, initial) {
-  const [value, setValue] = useState(null);
-  const [ready, setReady] = useState(false);
-  useEffect(() => { load(key, initial).then(v => { setValue(v); setReady(true); }); }, []);
+  const [value, setValue] = useState(() => lsLoad(key, initial));
   const set = useCallback((v) => {
-    setValue(prev => { const next = typeof v === "function" ? v(prev) : v; save(key, next); return next; });
+    setValue(prev => {
+      const next = typeof v === "function" ? v(prev) : v;
+      lsSave(key, next);
+      return next;
+    });
   }, [key]);
-  return [value, set, ready];
+  return [value, set, true];
 }
 
 // ===================== INITIAL DATA =====================
