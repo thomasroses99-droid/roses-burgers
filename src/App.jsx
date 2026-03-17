@@ -1742,7 +1742,16 @@ function importarDatos(archivo, onDone) {
     try {
       const datos = JSON.parse(e.target.result);
       Object.entries(datos).forEach(([k, v]) => localStorage.setItem(k, v));
-      onDone();
+      // Escribir directo en Firebase antes de recargar, para que no pise los datos importados
+      if (firestore) {
+        const data = {};
+        Object.entries(datos).forEach(([k, v]) => { data[k] = v; });
+        firestore.setDoc(firestore.doc(firestore.db, "rb", "main3"), data, { merge: false })
+          .then(() => onDone())
+          .catch(() => onDone());
+      } else {
+        onDone();
+      }
     } catch { alert("Archivo inválido."); }
   };
   reader.readAsText(archivo);
