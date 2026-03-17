@@ -1,37 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { initializeApp } from "firebase/app";
-import { getFirestore, doc, onSnapshot, setDoc } from "firebase/firestore";
-
-// ===================== FIREBASE =====================
-const FB_CFG = {
-  apiKey:            import.meta.env.VITE_FB_API_KEY,
-  authDomain:        import.meta.env.VITE_FB_AUTH_DOMAIN,
-  projectId:         import.meta.env.VITE_FB_PROJECT_ID,
-  storageBucket:     import.meta.env.VITE_FB_STORAGE_BUCKET,
-  messagingSenderId: import.meta.env.VITE_FB_MESSAGING_SENDER_ID,
-  appId:             import.meta.env.VITE_FB_APP_ID,
-};
-
-let db = null;
-if (FB_CFG.apiKey && FB_CFG.projectId) {
-  try { db = getFirestore(initializeApp(FB_CFG)); } catch {}
-}
-
-const stateRegistry = new Map(); // key → setValue
-let syncTimer = null;
-
-function scheduleCloudSync() {
-  if (!db) return;
-  clearTimeout(syncTimer);
-  syncTimer = setTimeout(() => {
-    const snap = {};
-    for (const key of stateRegistry.keys()) {
-      const v = localStorage.getItem(key);
-      if (v !== null) snap[key] = v;
-    }
-    setDoc(doc(db, "rb", "main"), snap).catch(() => {});
-  }, 800);
-}
 
 // ===================== STORAGE =====================
 function lsLoad(key, fallback) {
@@ -41,10 +8,7 @@ function lsLoad(key, fallback) {
   } catch { return fallback; }
 }
 function lsSave(key, value) {
-  try {
-    localStorage.setItem(key, JSON.stringify(value));
-    scheduleCloudSync();
-  } catch {}
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 function usePersisted(key, initial) {
   const [value, setValue] = useState(() => lsLoad(key, initial));
@@ -54,10 +18,6 @@ function usePersisted(key, initial) {
       lsSave(key, next);
       return next;
     });
-  }, [key]);
-  useEffect(() => {
-    stateRegistry.set(key, setValue);
-    return () => stateRegistry.delete(key);
   }, [key]);
   return [value, set, true];
 }
@@ -1745,24 +1705,6 @@ function importarDatos(archivo, onDone) {
 export default function App() {
   const [tab, setTab] = useState(0);
 
-  // Listener en tiempo real de Firestore → actualiza todos los estados
-  useEffect(() => {
-    if (!db) return;
-    const unsub = onSnapshot(doc(db, "rb", "main"), (snap) => {
-      if (!snap.exists()) return;
-      const data = snap.data();
-      for (const [k, setter] of stateRegistry) {
-        if (data[k] !== undefined) {
-          try {
-            const parsed = JSON.parse(data[k]);
-            localStorage.setItem(k, data[k]);
-            setter(parsed);
-          } catch {}
-        }
-      }
-    });
-    return unsub;
-  }, []);
   const [insumos, setInsumos, r0] = usePersisted(KEYS.insumos, initialInsumos);
   const [salsas, setSalsas, r1] = usePersisted(KEYS.salsas, initialSalsas);
   const [burgers, setBurgers, r2] = usePersisted(KEYS.burgers, initialBurgers);
