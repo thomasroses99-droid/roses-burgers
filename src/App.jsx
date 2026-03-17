@@ -1,6 +1,42 @@
 import { useState, useEffect, useCallback } from "react";
 
 // ===================== STORAGE =====================
+const stateRegistry = new Map(); // key → setValue
+let firestore = null;
+let syncTimer = null;
+
+// Firebase carga en background para no bloquear la página
+import("./firebase.js").then(fb => {
+  firestore = fb;
+  // Cuando Firebase está listo, subir el estado local si no hay nada en la nube
+  fb.onSnapshot(fb.doc(fb.db, "rb", "main"), (snap) => {
+    const data = snap.exists() ? snap.data() : {};
+    for (const [k, setter] of stateRegistry) {
+      if (data[k] !== undefined) {
+        try {
+          const parsed = JSON.parse(data[k]);
+          localStorage.setItem(k, data[k]);
+          setter(parsed);
+        } catch {}
+      }
+    }
+  });
+}).catch(() => {});
+
+function scheduleSync() {
+  if (!firestore) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(() => {
+    if (!firestore) return;
+    const data = {};
+    for (const key of stateRegistry.keys()) {
+      const v = localStorage.getItem(key);
+      if (v !== null) data[key] = v;
+    }
+    firestore.setDoc(firestore.doc(firestore.db, "rb", "main"), data).catch(() => {});
+  }, 800);
+}
+
 function lsLoad(key, fallback) {
   try {
     const r = localStorage.getItem(key);
@@ -8,7 +44,10 @@ function lsLoad(key, fallback) {
   } catch { return fallback; }
 }
 function lsSave(key, value) {
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    scheduleSync();
+  } catch {}
 }
 function usePersisted(key, initial) {
   const [value, setValue] = useState(() => lsLoad(key, initial));
@@ -18,6 +57,10 @@ function usePersisted(key, initial) {
       lsSave(key, next);
       return next;
     });
+  }, [key]);
+  useEffect(() => {
+    stateRegistry.set(key, setValue);
+    return () => stateRegistry.delete(key);
   }, [key]);
   return [value, set, true];
 }
