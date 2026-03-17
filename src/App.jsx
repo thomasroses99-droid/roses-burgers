@@ -11,7 +11,7 @@ let onFbConnected = null;
 // Firebase carga en background para no bloquear la página
 import("./firebase.js").then(fb => {
   firestore = fb;
-  fb.onSnapshot(fb.doc(fb.db, "rb", "main"), (snap) => {
+  fb.onSnapshot(fb.doc(fb.db, "rb", "main3"), (snap) => {
     if (onFbConnected) onFbConnected(true);
     const data = snap.exists() ? snap.data() : {};
     for (const [k, setter] of stateRegistry) {
@@ -36,7 +36,7 @@ function scheduleSync() {
       const v = localStorage.getItem(key);
       if (v !== null) data[key] = v;
     }
-    firestore.setDoc(firestore.doc(firestore.db, "rb", "main"), data).catch(() => {});
+    firestore.setDoc(firestore.doc(firestore.db, "rb", "main3"), data).catch(() => {});
   }, 800);
 }
 
