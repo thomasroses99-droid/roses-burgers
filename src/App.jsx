@@ -5,11 +5,14 @@ const stateRegistry = new Map(); // key → setValue
 let firestore = null;
 let syncTimer = null;
 
+// Callbacks para notificar estado de conexión a la UI
+let onFbConnected = null;
+
 // Firebase carga en background para no bloquear la página
 import("./firebase.js").then(fb => {
   firestore = fb;
-  // Cuando Firebase está listo, subir el estado local si no hay nada en la nube
   fb.onSnapshot(fb.doc(fb.db, "rb", "main"), (snap) => {
+    if (onFbConnected) onFbConnected(true);
     const data = snap.exists() ? snap.data() : {};
     for (const [k, setter] of stateRegistry) {
       if (data[k] !== undefined) {
@@ -20,8 +23,8 @@ import("./firebase.js").then(fb => {
         } catch {}
       }
     }
-  });
-}).catch(() => {});
+  }, () => { if (onFbConnected) onFbConnected(false); });
+}).catch(() => { if (onFbConnected) onFbConnected(false); });
 
 function scheduleSync() {
   if (!firestore) return;
@@ -1747,13 +1750,15 @@ function importarDatos(archivo, onDone) {
 
 export default function App() {
   const [tab, setTab] = useState(0);
+  const [fbOk, setFbOk] = useState(null); // null=cargando, true=conectado, false=error
+  useEffect(() => { onFbConnected = setFbOk; }, []);
 
-  const [insumos, setInsumos, r0] = usePersisted(KEYS.insumos, initialInsumos);
-  const [salsas, setSalsas, r1] = usePersisted(KEYS.salsas, initialSalsas);
-  const [burgers, setBurgers, r2] = usePersisted(KEYS.burgers, initialBurgers);
-  const [costosFijos, setCostosFijos, r3] = usePersisted(KEYS.costosFijos, initialCostosFijos);
+  const [insumos, setInsumos, r0] = usePersisted(KEYS.insumos, []);
+  const [salsas, setSalsas, r1] = usePersisted(KEYS.salsas, []);
+  const [burgers, setBurgers, r2] = usePersisted(KEYS.burgers, []);
+  const [costosFijos, setCostosFijos, r3] = usePersisted(KEYS.costosFijos, []);
   const [pagos, setPagos, r4] = usePersisted(KEYS.pagos, {});
-  const [proveedores, setProveedores, rp0] = usePersisted(KEYS.proveedores, initialProveedores);
+  const [proveedores, setProveedores, rp0] = usePersisted(KEYS.proveedores, []);
   const [pagosP, setPagosP, rp1] = usePersisted(KEYS.pagosP, {});
   const [caja, setCaja, r5] = usePersisted(KEYS.caja, "");
   const [banco, setBanco, r6] = usePersisted(KEYS.banco, "");
@@ -1817,7 +1822,9 @@ export default function App() {
             <div style={{ color: "#6a9a7e", fontFamily: "'DM Mono', monospace", fontSize: "10px", textAlign: "right" }}>
               <div style={{ color: "#1a7a3a" }}>{mesActual.toUpperCase()}</div>
               <div>Día {hoy} de {diasDelMes()}</div>
-              <div style={{ color: "#2a6a3a", fontSize: "9px", marginTop: "1px" }}>💾 local</div>
+              <div style={{ fontSize: "9px", marginTop: "1px", color: fbOk === true ? "#1a7a3a" : fbOk === false ? "#cc4400" : "#aaa" }}>
+                {fbOk === true ? "☁️ nube sincronizada" : fbOk === false ? "⚠️ sin conexión nube" : "⏳ conectando..."}
+              </div>
             </div>
           </div>
         </div>
