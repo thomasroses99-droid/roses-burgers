@@ -1675,6 +1675,33 @@ const KEYS = {
   ventasReg: "hb-ventas-reg",
 };
 
+function exportarDatos() {
+  const datos = {};
+  Object.values(KEYS).forEach(k => {
+    const v = localStorage.getItem(k);
+    if (v !== null) datos[k] = v;
+  });
+  const blob = new Blob([JSON.stringify(datos, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `roses-burgers-${new Date().toISOString().split("T")[0]}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importarDatos(archivo, onDone) {
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const datos = JSON.parse(e.target.result);
+      Object.entries(datos).forEach(([k, v]) => localStorage.setItem(k, v));
+      onDone();
+    } catch { alert("Archivo inválido."); }
+  };
+  reader.readAsText(archivo);
+}
+
 export default function App() {
   const [tab, setTab] = useState(0);
   const [insumos, setInsumos, r0] = usePersisted(KEYS.insumos, initialInsumos);
@@ -1735,10 +1762,19 @@ export default function App() {
               <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace" }}>Sistema de costos y gestión</div>
             </div>
           </div>
-          <div style={{ color: "#6a9a7e", fontFamily: "'DM Mono', monospace", fontSize: "10px", textAlign: "right" }}>
-            <div style={{ color: "#1a7a3a" }}>{mesActual.toUpperCase()}</div>
-            <div>Día {hoy} de {diasDelMes()}</div>
-            <div style={{ color: "#2a6a3a", fontSize: "9px", marginTop: "1px" }}>💾 guardado en este navegador</div>
+          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div style={{ display: "flex", gap: "6px" }}>
+              <button onClick={exportarDatos} title="Exportar todos los datos como archivo JSON" style={{ background: "#e8f5e9", border: "1px solid #a5d6a7", borderRadius: "6px", padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "#2e7d32", fontWeight: "700" }}>⬇ Exportar</button>
+              <label title="Importar datos desde archivo JSON" style={{ background: "#e8f5e9", border: "1px solid #a5d6a7", borderRadius: "6px", padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "#2e7d32", fontWeight: "700" }}>
+                ⬆ Importar
+                <input type="file" accept=".json" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) importarDatos(e.target.files[0], () => window.location.reload()); }} />
+              </label>
+            </div>
+            <div style={{ color: "#6a9a7e", fontFamily: "'DM Mono', monospace", fontSize: "10px", textAlign: "right" }}>
+              <div style={{ color: "#1a7a3a" }}>{mesActual.toUpperCase()}</div>
+              <div>Día {hoy} de {diasDelMes()}</div>
+              <div style={{ color: "#2a6a3a", fontSize: "9px", marginTop: "1px" }}>💾 local</div>
+            </div>
           </div>
         </div>
       </div>
