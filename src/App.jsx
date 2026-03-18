@@ -8,9 +8,10 @@ let syncTimer = null;
 // Callbacks para notificar estado de conexión a la UI
 let onFbConnected = null;
 
-// Auth
-let authModule = null;
-import("./firebase.js").then(fb => { authModule = fb; });
+// Auth simple
+const AUTH_USER = "thomasroses99@mail.com";
+const AUTH_PASS = "Marcelo52";
+const SESSION_KEY = "rb-session";
 
 // Firebase carga en background para no bloquear la página
 import("./firebase.js").then(fb => {
@@ -1717,19 +1718,15 @@ function LoginScreen({ onLogin }) {
   const [email, setEmail] = useState("");
   const [pass, setPass]   = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
   const mono = "'DM Mono', monospace";
 
-  const login = async () => {
-    if (!email || !pass) return;
-    setLoading(true); setError("");
-    try {
-      const fb = await import("./firebase.js");
-      await fb.signInWithEmailAndPassword(fb.auth, email, pass);
+  const login = () => {
+    if (email === AUTH_USER && pass === AUTH_PASS) {
+      localStorage.setItem(SESSION_KEY, "1");
       onLogin();
-    } catch {
+    } else {
       setError("Email o contraseña incorrectos.");
-    } finally { setLoading(false); }
+    }
   };
 
   return (
@@ -1742,25 +1739,17 @@ function LoginScreen({ onLogin }) {
         </div>
         <div style={{ marginBottom:"12px" }}>
           <div style={{ fontSize:"10px", color:"#5a8a6e", marginBottom:"4px", textTransform:"uppercase", letterSpacing:"0.08em" }}>Email</div>
-          <input
-            type="email" value={email} onChange={e => setEmail(e.target.value)}
-            onKeyDown={e => e.key==="Enter" && login()}
-            placeholder="tu@email.com"
-            style={{ width:"100%", padding:"10px 12px", border:"1px solid #c8e6c9", borderRadius:"7px", fontSize:"13px", outline:"none", background:"#fafff9", fontFamily:mono }}
-          />
+          <input type="email" value={email} onChange={e=>setEmail(e.target.value)} onKeyDown={e=>e.key==="Enter"&&login()} placeholder="tu@email.com"
+            style={{ width:"100%", padding:"10px 12px", border:"1px solid #c8e6c9", borderRadius:"7px", fontSize:"13px", outline:"none", background:"#fafff9", fontFamily:mono }} />
         </div>
         <div style={{ marginBottom:"20px" }}>
           <div style={{ fontSize:"10px", color:"#5a8a6e", marginBottom:"4px", textTransform:"uppercase", letterSpacing:"0.08em" }}>Contraseña</div>
-          <input
-            type="password" value={pass} onChange={e => setPass(e.target.value)}
-            onKeyDown={e => e.key==="Enter" && login()}
-            placeholder="••••••••"
-            style={{ width:"100%", padding:"10px 12px", border:"1px solid #c8e6c9", borderRadius:"7px", fontSize:"13px", outline:"none", background:"#fafff9", fontFamily:mono }}
-          />
+          <input type="password" value={pass} onChange={e=>setPass(e.target.value)} onKeyDown={e=>e.key==="Enter"&&login()} placeholder="••••••••"
+            style={{ width:"100%", padding:"10px 12px", border:"1px solid #c8e6c9", borderRadius:"7px", fontSize:"13px", outline:"none", background:"#fafff9", fontFamily:mono }} />
         </div>
         {error && <div style={{ background:"#fdecea", color:"#c0392b", borderRadius:"7px", padding:"8px 12px", fontSize:"11px", marginBottom:"14px", textAlign:"center" }}>{error}</div>}
-        <button onClick={login} disabled={loading} style={{ width:"100%", background:"#1a7a3a", color:"#fff", border:"none", borderRadius:"7px", padding:"11px", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:mono }}>
-          {loading ? "Ingresando..." : "Ingresar"}
+        <button onClick={login} style={{ width:"100%", background:"#1a7a3a", color:"#fff", border:"none", borderRadius:"7px", padding:"11px", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:mono }}>
+          Ingresar
         </button>
       </div>
     </div>
@@ -1819,20 +1808,10 @@ function importarDatos(archivo, onDone) {
 export default function App() {
   const [tab, setTab] = useState(0);
   const [fbOk, setFbOk] = useState(null);
-  const [user, setUser] = useState(undefined); // undefined=checking, null=no user, object=logged in
+  const [loggedIn, setLoggedIn] = useState(() => localStorage.getItem(SESSION_KEY) === "1");
   useEffect(() => { onFbConnected = setFbOk; }, []);
-  useEffect(() => {
-    import("./firebase.js").then(fb => {
-      fb.onAuthStateChanged(fb.auth, u => setUser(u ?? null));
-    });
-  }, []);
 
-  if (user === undefined) return (
-    <div style={{ minHeight:"100vh", background:"#0d1f14", display:"flex", alignItems:"center", justifyContent:"center" }}>
-      <div style={{ color:"#6ee49a", fontFamily:"'DM Mono',monospace", fontSize:"12px" }}>⏳ Cargando...</div>
-    </div>
-  );
-  if (!user) return <LoginScreen onLogin={() => {}} />;
+  if (!loggedIn) return <LoginScreen onLogin={() => setLoggedIn(true)} />;
 
   const [insumos, setInsumos, r0] = usePersisted(KEYS.insumos, []);
   const [salsas, setSalsas, r1] = usePersisted(KEYS.salsas, []);
@@ -1930,7 +1909,7 @@ export default function App() {
           <div style={{ color: "#3a6a4a", fontFamily: "'DM Mono', monospace", fontSize: "9px", marginTop: "4px" }}>
             {mesActual.toUpperCase()}<br />Día {hoy} de {diasDelMes()}
           </div>
-          <button onClick={() => import("./firebase.js").then(fb => fb.signOut(fb.auth))}
+          <button onClick={() => { localStorage.removeItem(SESSION_KEY); setLoggedIn(false); }}
             style={{ marginTop:"8px", background:"transparent", border:"1px solid #3a6a4a", borderRadius:"6px", padding:"5px 10px", cursor:"pointer", fontFamily:"'DM Mono',monospace", fontSize:"10px", color:"#6a9a7e", textAlign:"left", width:"100%" }}>
             ↩ Cerrar sesión
           </button>
