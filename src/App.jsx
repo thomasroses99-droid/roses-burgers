@@ -1877,9 +1877,6 @@ export default function App() {
   const [currentUser, setCurrentUser] = useState(() => { try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; } });
   useEffect(() => { onFbConnected = setFbOk; }, []);
 
-  const logout = () => { localStorage.removeItem(SESSION_KEY); setCurrentUser(null); };
-  if (!currentUser) return <LoginScreen onLogin={u => setCurrentUser(u)} />;
-
   const [insumos, setInsumos, r0] = usePersisted(KEYS.insumos, []);
   const [salsas, setSalsas, r1] = usePersisted(KEYS.salsas, []);
   const [burgers, setBurgers, r2] = usePersisted(KEYS.burgers, []);
@@ -1897,6 +1894,9 @@ export default function App() {
   const [stockInicial, setStockInicial, r11] = usePersisted(KEYS.stockInicial, {});
   const [ventasReg, setVentasReg, r12] = usePersisted(KEYS.ventasReg, []);
   const [usuarios, setUsuarios, r14] = usePersisted(KEYS.usuarios, []);
+
+  const logout = () => { localStorage.removeItem(SESSION_KEY); setCurrentUser(null); };
+  if (!currentUser) return <LoginScreen onLogin={u => setCurrentUser(u)} />;
   const mesKey = `${new Date().getFullYear()}-${new Date().getMonth()}`;
 
   if (![r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,rp0,rp1].every(Boolean)) return (
