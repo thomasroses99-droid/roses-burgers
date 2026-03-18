@@ -9,8 +9,8 @@ let syncTimer = null;
 let onFbConnected = null;
 
 // Auth simple
-const AUTH_USER = "thomasroses99@mail.com";
-const AUTH_PASS = "Marcelo52";
+const ADMIN_EMAIL = "thomasroses99@gmail.com";
+const ADMIN_PASS  = "Marcelo52";
 const SESSION_KEY = "rb-session";
 
 // Firebase carga en background para no bloquear la página
@@ -1718,15 +1718,29 @@ function LoginScreen({ onLogin }) {
   const [email, setEmail] = useState("");
   const [pass, setPass]   = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const mono = "'DM Mono', monospace";
 
-  const login = () => {
-    if (email === AUTH_USER && pass === AUTH_PASS) {
-      localStorage.setItem(SESSION_KEY, "1");
-      onLogin();
-    } else {
-      setError("Email o contraseña incorrectos.");
+  const login = async () => {
+    if (!email || !pass) return;
+    setLoading(true); setError("");
+    // Admin hardcodeado
+    if (email === ADMIN_EMAIL && pass === ADMIN_PASS) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ email, isAdmin: true }));
+      onLogin({ email, isAdmin: true }); setLoading(false); return;
     }
+    // Usuarios extra guardados en Firebase
+    try {
+      const fb = await import("./firebase.js");
+      const snap = await fb.getDoc(fb.doc(fb.db, "rb", "main3"));
+      const users = snap.exists() && snap.data()["hb-users"] ? JSON.parse(snap.data()["hb-users"]) : [];
+      const found = users.find(u => u.email === email && u.password === pass);
+      if (found) {
+        localStorage.setItem(SESSION_KEY, JSON.stringify({ email, isAdmin: false }));
+        onLogin({ email, isAdmin: false });
+      } else { setError("Email o contraseña incorrectos."); }
+    } catch { setError("Error de conexión. Intentá de nuevo."); }
+    setLoading(false);
   };
 
   return (
@@ -1748,10 +1762,59 @@ function LoginScreen({ onLogin }) {
             style={{ width:"100%", padding:"10px 12px", border:"1px solid #c8e6c9", borderRadius:"7px", fontSize:"13px", outline:"none", background:"#fafff9", fontFamily:mono }} />
         </div>
         {error && <div style={{ background:"#fdecea", color:"#c0392b", borderRadius:"7px", padding:"8px 12px", fontSize:"11px", marginBottom:"14px", textAlign:"center" }}>{error}</div>}
-        <button onClick={login} style={{ width:"100%", background:"#1a7a3a", color:"#fff", border:"none", borderRadius:"7px", padding:"11px", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:mono }}>
-          Ingresar
+        <button onClick={login} disabled={loading} style={{ width:"100%", background:"#1a7a3a", color:"#fff", border:"none", borderRadius:"7px", padding:"11px", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:mono }}>
+          {loading ? "Verificando..." : "Ingresar"}
         </button>
       </div>
+    </div>
+  );
+}
+
+// ===================== USUARIOS =====================
+function UsuariosTab({ usuarios, setUsuarios }) {
+  const [form, setForm] = useState({ nombre: "", email: "", password: "" });
+  const [error, setError] = useState("");
+  const mono = "'DM Mono', monospace";
+
+  const add = () => {
+    if (!form.nombre || !form.email || !form.password) { setError("Completá todos los campos."); return; }
+    if (usuarios.find(u => u.email === form.email)) { setError("Ese email ya existe."); return; }
+    setUsuarios([...usuarios, { id: Date.now(), ...form }]);
+    setForm({ nombre: "", email: "", password: "" }); setError("");
+  };
+  const del = id => { if (window.confirm("¿Eliminar este usuario?")) setUsuarios(usuarios.filter(u => u.id !== id)); };
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+      <Card>
+        <H title="Agregar usuario" />
+        <div style={{ display:"flex", gap:"7px", flexWrap:"wrap" }}>
+          <input placeholder="Nombre" value={form.nombre} onChange={e=>setForm({...form,nombre:e.target.value})} style={{...IS, flex:"1 1 130px"}} />
+          <input type="email" placeholder="Email" value={form.email} onChange={e=>setForm({...form,email:e.target.value})} style={{...IS, flex:"1 1 180px"}} />
+          <input type="password" placeholder="Contraseña" value={form.password} onChange={e=>setForm({...form,password:e.target.value})} style={{...IS, flex:"1 1 130px"}} />
+          <Btn onClick={add}>+ Agregar</Btn>
+        </div>
+        {error && <div style={{color:"#c0392b",fontSize:"11px",marginTop:"8px",fontFamily:mono}}>{error}</div>}
+      </Card>
+      <Card>
+        <H title="Usuarios con acceso" />
+        <div style={{padding:"7px 0 10px",borderBottom:"1px solid #d4edd9",display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:"7px"}}>
+          {["Nombre","Email",""].map(h=><div key={h} style={{color:"#1a5c2a",fontSize:"10px",fontFamily:mono,textTransform:"uppercase"}}>{h}</div>)}
+        </div>
+        <div style={{padding:"9px 0",borderBottom:"1px solid #e0f0e6",display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:"7px",alignItems:"center"}}>
+          <span style={{fontSize:"12px",color:"#1a3a25",fontFamily:mono}}>Thomas (admin)</span>
+          <span style={{fontSize:"11px",color:"#5a8a6e",fontFamily:mono}}>{ADMIN_EMAIL}</span>
+          <span style={{fontSize:"10px",background:"#e8f5e9",color:"#1a7a3a",padding:"2px 8px",borderRadius:"4px",fontWeight:"700"}}>Admin</span>
+        </div>
+        {usuarios.length === 0 && <div style={{color:"#888",fontSize:"12px",padding:"12px 0",fontFamily:mono}}>No hay usuarios extra todavía.</div>}
+        {usuarios.map(u => (
+          <div key={u.id} style={{padding:"9px 0",borderBottom:"1px solid #e0f0e6",display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:"7px",alignItems:"center"}}>
+            <span style={{fontSize:"12px",color:"#1a3a25",fontFamily:mono}}>{u.nombre}</span>
+            <span style={{fontSize:"11px",color:"#5a8a6e",fontFamily:mono}}>{u.email}</span>
+            <X onClick={()=>del(u.id)} />
+          </div>
+        ))}
+      </Card>
     </div>
   );
 }
@@ -1767,6 +1830,7 @@ const KEYS = {
   cajaPresets: "hb-caja-presets",
   stockInicial: "hb-stock-inicial",
   ventasReg: "hb-ventas-reg",
+  usuarios: "hb-users",
 };
 
 function exportarDatos() {
@@ -1808,10 +1872,11 @@ function importarDatos(archivo, onDone) {
 export default function App() {
   const [tab, setTab] = useState(0);
   const [fbOk, setFbOk] = useState(null);
-  const [loggedIn, setLoggedIn] = useState(() => localStorage.getItem(SESSION_KEY) === "1");
+  const [currentUser, setCurrentUser] = useState(() => { try { return JSON.parse(localStorage.getItem(SESSION_KEY)); } catch { return null; } });
   useEffect(() => { onFbConnected = setFbOk; }, []);
 
-  if (!loggedIn) return <LoginScreen onLogin={() => setLoggedIn(true)} />;
+  const logout = () => { localStorage.removeItem(SESSION_KEY); setCurrentUser(null); };
+  if (!currentUser) return <LoginScreen onLogin={u => setCurrentUser(u)} />;
 
   const [insumos, setInsumos, r0] = usePersisted(KEYS.insumos, []);
   const [salsas, setSalsas, r1] = usePersisted(KEYS.salsas, []);
@@ -1829,9 +1894,10 @@ export default function App() {
   const [cajaPresets, setCajaPresets, r13] = usePersisted(KEYS.cajaPresets, []);
   const [stockInicial, setStockInicial, r11] = usePersisted(KEYS.stockInicial, {});
   const [ventasReg, setVentasReg, r12] = usePersisted(KEYS.ventasReg, []);
+  const [usuarios, setUsuarios, r14] = usePersisted(KEYS.usuarios, []);
   const mesKey = `${new Date().getFullYear()}-${new Date().getMonth()}`;
 
-  if (![r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,rp0,rp1].every(Boolean)) return (
+  if (![r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,rp0,rp1].every(Boolean)) return (
     <div style={{ minHeight: "100vh", background: "#f0f7f2", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "12px" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;700&display=swap');`}</style>
       <div style={{ fontSize: "28px" }}>🍔</div>
@@ -1850,6 +1916,7 @@ export default function App() {
     { label: "Stock", icon: "📦" },
     { label: "Caja Diaria", icon: "💵" },
     { label: "Caja", icon: "📊" },
+    ...(currentUser?.isAdmin ? [{ label: "Usuarios", icon: "👥" }] : []),
   ];
 
   const SB_BG   = "#0d1f14";
@@ -1909,8 +1976,9 @@ export default function App() {
           <div style={{ color: "#3a6a4a", fontFamily: "'DM Mono', monospace", fontSize: "9px", marginTop: "4px" }}>
             {mesActual.toUpperCase()}<br />Día {hoy} de {diasDelMes()}
           </div>
-          <button onClick={() => { localStorage.removeItem(SESSION_KEY); setLoggedIn(false); }}
-            style={{ marginTop:"8px", background:"transparent", border:"1px solid #3a6a4a", borderRadius:"6px", padding:"5px 10px", cursor:"pointer", fontFamily:"'DM Mono',monospace", fontSize:"10px", color:"#6a9a7e", textAlign:"left", width:"100%" }}>
+          <div style={{color:"#3a6a4a",fontFamily:"'DM Mono',monospace",fontSize:"9px",marginBottom:"4px",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{currentUser?.email}</div>
+          <button onClick={logout}
+            style={{ background:"transparent", border:"1px solid #3a6a4a", borderRadius:"6px", padding:"5px 10px", cursor:"pointer", fontFamily:"'DM Mono',monospace", fontSize:"10px", color:"#6a9a7e", textAlign:"left", width:"100%" }}>
             ↩ Cerrar sesión
           </button>
         </div>
@@ -1934,6 +2002,7 @@ export default function App() {
           {tab === 7 && <StockTab insumos={insumos} ventas={ventasReg} burgers={burgers} salsas={salsas} stockInicial={stockInicial} setStockInicial={setStockInicial} />}
           {tab === 8 && <CajaDiariaTab cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} presets={cajaPresets || []} setPresets={setCajaPresets} />}
           {tab === 9 && <CajaBancoTab costosFijos={costosFijos} pagos={pagos} proveedores={proveedores || []} pagosP={pagosP} mesKey={mesKey} cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} banco={banco} setBanco={setBanco} pedidosPendientes={pedidos} setPedidosPendientes={setPedidos} ventasDiarias={ventasDiarias} setVentasDiarias={setVentasDiarias} registros={registros || []} setRegistros={setRegistros} />}
+          {tab === 10 && currentUser?.isAdmin && <UsuariosTab usuarios={usuarios} setUsuarios={setUsuarios} />}
         </div>
       </div>
     </div>
