@@ -1801,8 +1801,19 @@ export default function App() {
     { label: "Caja", icon: "📊" },
   ];
 
+  const SB_BG   = "#0d1f14";
+  const SB_ACT  = "#1a7a3a";
+  const sideBtn = (active) => ({
+    display: "flex", alignItems: "center", gap: "9px", padding: "10px 18px",
+    cursor: "pointer", background: active ? "#1a7a3a22" : "transparent",
+    borderLeft: `3px solid ${active ? SB_ACT : "transparent"}`,
+    color: active ? "#ffffff" : "#6a9a7e", fontSize: "12px",
+    fontWeight: active ? "700" : "400", border: "none", width: "100%",
+    textAlign: "left", fontFamily: "'DM Mono', monospace",
+  });
+
   return (
-    <div style={{ minHeight: "100vh", background: "#f0f7f2", color: "#1a3a25", fontFamily: "'DM Sans', sans-serif" }}>
+    <div style={{ display: "flex", minHeight: "100vh", fontFamily: "'DM Sans', sans-serif" }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500;700&family=DM+Sans:wght@400;500;700&display=swap');
         * { box-sizing: border-box; }
@@ -1811,49 +1822,64 @@ export default function App() {
         select option { background: #f0faf3; }
         input:focus, select:focus { border-color: #1a7a3a60 !important; }
       `}</style>
-      <div style={{ background: "#ffffff", borderBottom: "1px solid #d4edd9", padding: "13px 22px" }}>
-        <div style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "11px" }}>
-            <div style={{ background: "#1a7a3a", color: "#d4edd9", borderRadius: "9px", padding: "6px 11px", fontSize: "17px" }}>🍔</div>
+
+      {/* SIDEBAR */}
+      <div style={{ width: "220px", minWidth: "220px", background: SB_BG, minHeight: "100vh", display: "flex", flexDirection: "column" }}>
+        {/* Logo */}
+        <div style={{ padding: "18px 18px 14px", borderBottom: "1px solid #ffffff10" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "9px" }}>
+            <div style={{ background: "#1a7a3a", borderRadius: "8px", padding: "5px 9px", fontSize: "16px" }}>🍔</div>
             <div>
-              <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: "700", fontSize: "14px" }}>Roses Burgers</div>
-              <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace" }}>Sistema de costos y gestión</div>
-            </div>
-          </div>
-          <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-            <div style={{ display: "flex", gap: "6px" }}>
-              <button onClick={exportarDatos} title="Exportar todos los datos como archivo JSON" style={{ background: "#e8f5e9", border: "1px solid #a5d6a7", borderRadius: "6px", padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "#2e7d32", fontWeight: "700" }}>⬇ Exportar</button>
-              <label title="Importar datos desde archivo JSON" style={{ background: "#e8f5e9", border: "1px solid #a5d6a7", borderRadius: "6px", padding: "5px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "#2e7d32", fontWeight: "700" }}>
-                ⬆ Importar
-                <input type="file" accept=".json" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) importarDatos(e.target.files[0], () => window.location.reload()); }} />
-              </label>
-            </div>
-            <div style={{ color: "#6a9a7e", fontFamily: "'DM Mono', monospace", fontSize: "10px", textAlign: "right" }}>
-              <div style={{ color: "#1a7a3a" }}>{mesActual.toUpperCase()}</div>
-              <div>Día {hoy} de {diasDelMes()}</div>
-              <div style={{ fontSize: "9px", marginTop: "1px", color: fbOk === true ? "#1a7a3a" : fbOk === false ? "#cc4400" : "#aaa" }}>
-                {fbOk === true ? "☁️ nube sincronizada" : fbOk === false ? "⚠️ sin conexión nube" : "⏳ conectando..."}
+              <div style={{ color: "#fff", fontWeight: "700", fontSize: "13px", fontFamily: "'DM Mono', monospace" }}>Roses Burgers</div>
+              <div style={{ fontSize: "9px", marginTop: "2px", color: fbOk === true ? "#6ee49a" : fbOk === false ? "#f1948a" : "#556" }}>
+                {fbOk === true ? "☁️ sincronizado" : fbOk === false ? "⚠️ sin conexión" : "⏳ conectando..."}
               </div>
             </div>
           </div>
         </div>
-      </div>
-      <div style={{ background: "#ffffff", borderBottom: "1px solid #d4edd9", padding: "0 22px", overflowX: "auto" }}>
-        <div style={{ maxWidth: "1200px", margin: "0 auto", display: "flex", gap: "2px", padding: "5px 0" }}>
-          {tabs.map((t, i) => <TabBtn key={i} active={tab === i} onClick={() => setTab(i)} icon={t.icon}>{t.label}</TabBtn>)}
+
+        {/* Nav items */}
+        <div style={{ padding: "10px 0 4px", fontSize: "9px", color: "#3a6a4a", fontWeight: "700", letterSpacing: "1px", paddingLeft: "18px" }}>GESTIÓN</div>
+        {tabs.map((t, i) => (
+          <button key={i} style={sideBtn(tab === i)} onClick={() => setTab(i)}>
+            <span style={{ fontSize: "14px" }}>{t.icon}</span>
+            {t.label}
+          </button>
+        ))}
+
+        {/* Export/Import al fondo */}
+        <div style={{ marginTop: "auto", borderTop: "1px solid #ffffff10", padding: "12px 14px", display: "flex", flexDirection: "column", gap: "6px" }}>
+          <div style={{ fontSize: "9px", color: "#3a6a4a", fontWeight: "700", letterSpacing: "1px", marginBottom: "2px" }}>DATOS</div>
+          <button onClick={exportarDatos} style={{ background: "#1a7a3a22", border: "1px solid #1a7a3a44", borderRadius: "6px", padding: "6px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "#6ee49a", fontWeight: "700", textAlign: "left" }}>⬇ Exportar</button>
+          <label style={{ background: "#1a7a3a22", border: "1px solid #1a7a3a44", borderRadius: "6px", padding: "6px 10px", cursor: "pointer", fontFamily: "'DM Mono', monospace", fontSize: "10px", color: "#6ee49a", fontWeight: "700" }}>
+            ⬆ Importar
+            <input type="file" accept=".json" style={{ display: "none" }} onChange={e => { if (e.target.files[0]) importarDatos(e.target.files[0], () => window.location.reload()); }} />
+          </label>
+          <div style={{ color: "#3a6a4a", fontFamily: "'DM Mono', monospace", fontSize: "9px", marginTop: "4px" }}>
+            {mesActual.toUpperCase()}<br />Día {hoy} de {diasDelMes()}
+          </div>
         </div>
       </div>
-      <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "18px 22px" }}>
-        {tab === 0 && <InsumosTab insumos={insumos} setInsumos={setInsumos} />}
-        {tab === 1 && <SalsasTab salsas={salsas} setSalsas={setSalsas} insumos={insumos} />}
-        {tab === 2 && <BurgersTab burgers={burgers} setBurgers={setBurgers} insumos={insumos} salsas={salsas} />}
-        {tab === 3 && <PuntoEquilibrioTab burgers={burgers} costosFijos={costosFijos} insumos={insumos} salsas={salsas} />}
-        {tab === 4 && <CostosFijosTab costosFijos={costosFijos} setCostosFijos={setCostosFijos} pagos={pagos} setPagos={setPagos} mesKey={mesKey} />}
-        {tab === 5 && <ProveedoresTab proveedores={proveedores || []} setProveedores={setProveedores} pagosP={pagosP} setPagosP={setPagosP} mesKey={mesKey} />}
-        {tab === 6 && <VentasTab ventas={ventasReg} setVentas={setVentasReg} burgers={burgers} insumos={insumos} salsas={salsas} />}
-        {tab === 7 && <StockTab insumos={insumos} ventas={ventasReg} burgers={burgers} salsas={salsas} stockInicial={stockInicial} setStockInicial={setStockInicial} />}
-        {tab === 8 && <CajaDiariaTab cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} presets={cajaPresets || []} setPresets={setCajaPresets} />}
-        {tab === 9 && <CajaBancoTab costosFijos={costosFijos} pagos={pagos} proveedores={proveedores || []} pagosP={pagosP} mesKey={mesKey} cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} banco={banco} setBanco={setBanco} pedidosPendientes={pedidos} setPedidosPendientes={setPedidos} ventasDiarias={ventasDiarias} setVentasDiarias={setVentasDiarias} registros={registros || []} setRegistros={setRegistros} />}
+
+      {/* MAIN */}
+      <div style={{ flex: 1, background: "#f0f7f2", minHeight: "100vh", overflowY: "auto" }}>
+        <div style={{ background: "#ffffff", borderBottom: "1px solid #d4edd9", padding: "13px 24px", display: "flex", alignItems: "center", minHeight: "52px" }}>
+          <span style={{ fontWeight: "700", fontSize: "15px", color: "#1a3a25", fontFamily: "'DM Mono', monospace" }}>
+            {tabs[tab].icon} {tabs[tab].label}
+          </span>
+        </div>
+        <div style={{ padding: "20px 24px" }}>
+          {tab === 0 && <InsumosTab insumos={insumos} setInsumos={setInsumos} />}
+          {tab === 1 && <SalsasTab salsas={salsas} setSalsas={setSalsas} insumos={insumos} />}
+          {tab === 2 && <BurgersTab burgers={burgers} setBurgers={setBurgers} insumos={insumos} salsas={salsas} />}
+          {tab === 3 && <PuntoEquilibrioTab burgers={burgers} costosFijos={costosFijos} insumos={insumos} salsas={salsas} />}
+          {tab === 4 && <CostosFijosTab costosFijos={costosFijos} setCostosFijos={setCostosFijos} pagos={pagos} setPagos={setPagos} mesKey={mesKey} />}
+          {tab === 5 && <ProveedoresTab proveedores={proveedores || []} setProveedores={setProveedores} pagosP={pagosP} setPagosP={setPagosP} mesKey={mesKey} />}
+          {tab === 6 && <VentasTab ventas={ventasReg} setVentas={setVentasReg} burgers={burgers} insumos={insumos} salsas={salsas} />}
+          {tab === 7 && <StockTab insumos={insumos} ventas={ventasReg} burgers={burgers} salsas={salsas} stockInicial={stockInicial} setStockInicial={setStockInicial} />}
+          {tab === 8 && <CajaDiariaTab cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} presets={cajaPresets || []} setPresets={setCajaPresets} />}
+          {tab === 9 && <CajaBancoTab costosFijos={costosFijos} pagos={pagos} proveedores={proveedores || []} pagosP={pagosP} mesKey={mesKey} cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} banco={banco} setBanco={setBanco} pedidosPendientes={pedidos} setPedidosPendientes={setPedidos} ventasDiarias={ventasDiarias} setVentasDiarias={setVentasDiarias} registros={registros || []} setRegistros={setRegistros} />}
+        </div>
       </div>
     </div>
   );
