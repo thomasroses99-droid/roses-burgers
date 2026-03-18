@@ -9,9 +9,14 @@ let syncTimer = null;
 let onFbConnected = null;
 
 // Auth simple
-const ADMIN_EMAIL = "thomasroses99@gmail.com";
-const ADMIN_PASS  = "Marcelo52";
 const SESSION_KEY = "rb-session";
+const USUARIOS_FIJOS = [
+  { email: "thomasroses99@gmail.com",    password: "Marcelo52",     isAdmin: true  },
+  { email: "nicolasroses199412@gmail.com", password: "Corrientes1967", isAdmin: false },
+  { email: "matiroses00@gmail.com",      password: "Evaperon8124",  isAdmin: false },
+];
+const ADMIN_EMAIL = USUARIOS_FIJOS[0].email;
+const ADMIN_PASS  = USUARIOS_FIJOS[0].password;
 
 // Firebase carga en background para no bloquear la página
 import("./firebase.js").then(fb => {
@@ -1721,35 +1726,17 @@ function LoginScreen({ onLogin }) {
   const [loading, setLoading] = useState(false);
   const mono = "'DM Mono', monospace";
 
-  const login = async () => {
+  const login = () => {
     const em = email.trim().toLowerCase();
     const pw = pass.trim();
-    if (!em || !pw) return;
-    setLoading(true); setError("");
-    // Admin hardcodeado
-    if (em === ADMIN_EMAIL && pw === ADMIN_PASS) {
-      localStorage.setItem(SESSION_KEY, JSON.stringify({ email: em, isAdmin: true }));
-      onLogin({ email: em, isAdmin: true }); setLoading(false); return;
+    if (!em || !pw) { setError("Completá todos los campos."); return; }
+    const found = USUARIOS_FIJOS.find(u => u.email === em && u.password === pw);
+    if (found) {
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ email: em, isAdmin: found.isAdmin }));
+      onLogin({ email: em, isAdmin: found.isAdmin });
+    } else {
+      setError("Email o contraseña incorrectos.");
     }
-    // Usuarios extra — primero buscar en localStorage (mismo dispositivo)
-    const localUsers = (() => { try { return JSON.parse(localStorage.getItem("hb-users") || "[]"); } catch { return []; } })();
-    const localFound = localUsers.find(u => u.email.trim().toLowerCase() === em && u.password.trim() === pw);
-    if (localFound) {
-      localStorage.setItem(SESSION_KEY, JSON.stringify({ email: em, isAdmin: false }));
-      onLogin({ email: em, isAdmin: false }); setLoading(false); return;
-    }
-    // Si no está en localStorage, buscar en Firebase (otro dispositivo)
-    try {
-      const fb = await import("./firebase.js");
-      const snap = await fb.getDoc(fb.doc(fb.db, "rb", "main3"));
-      const users = snap.exists() && snap.data()["hb-users"] ? JSON.parse(snap.data()["hb-users"]) : [];
-      const found = users.find(u => u.email.trim().toLowerCase() === em && u.password.trim() === pw);
-      if (found) {
-        localStorage.setItem(SESSION_KEY, JSON.stringify({ email: em, isAdmin: false }));
-        onLogin({ email: em, isAdmin: false });
-      } else { setError("Email o contraseña incorrectos."); }
-    } catch (err) { setError("Error: " + (err?.message || "no se pudo conectar")); }
-    setLoading(false);
   };
 
   return (
@@ -1771,8 +1758,8 @@ function LoginScreen({ onLogin }) {
             style={{ width:"100%", padding:"10px 12px", border:"1px solid #c8e6c9", borderRadius:"7px", fontSize:"13px", outline:"none", background:"#fafff9", fontFamily:mono }} />
         </div>
         {error && <div style={{ background:"#fdecea", color:"#c0392b", borderRadius:"7px", padding:"8px 12px", fontSize:"11px", marginBottom:"14px", textAlign:"center" }}>{error}</div>}
-        <button onClick={login} disabled={loading} style={{ width:"100%", background:"#1a7a3a", color:"#fff", border:"none", borderRadius:"7px", padding:"11px", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:mono }}>
-          {loading ? "Verificando..." : "Ingresar"}
+        <button onClick={login} style={{ width:"100%", background:"#1a7a3a", color:"#fff", border:"none", borderRadius:"7px", padding:"11px", fontSize:"13px", fontWeight:"700", cursor:"pointer", fontFamily:mono }}>
+          Ingresar
         </button>
       </div>
     </div>
