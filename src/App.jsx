@@ -1802,7 +1802,13 @@ function UsuariosTab({ usuarios, setUsuarios }) {
           <span style={{fontSize:"11px",color:"#5a8a6e",fontFamily:mono}}>{ADMIN_EMAIL}</span>
           <span style={{fontSize:"10px",background:"#e8f5e9",color:"#1a7a3a",padding:"2px 8px",borderRadius:"4px",fontWeight:"700"}}>Admin</span>
         </div>
-        {usuarios.length === 0 && <div style={{color:"#888",fontSize:"12px",padding:"12px 0",fontFamily:mono}}>No hay usuarios extra todavía.</div>}
+        {USUARIOS_FIJOS.slice(1).map(u => (
+          <div key={u.email} style={{padding:"9px 0",borderBottom:"1px solid #e0f0e6",display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:"7px",alignItems:"center"}}>
+            <span style={{fontSize:"12px",color:"#1a3a25",fontFamily:mono}}>{u.email}</span>
+            <span style={{fontSize:"11px",color:"#5a8a6e",fontFamily:mono}}>Usuario fijo</span>
+            <span style={{fontSize:"10px",background:"#e8f0fe",color:"#2471a3",padding:"2px 8px",borderRadius:"4px",fontWeight:"700"}}>Fijo</span>
+          </div>
+        ))}
         {usuarios.map(u => (
           <div key={u.id} style={{padding:"9px 0",borderBottom:"1px solid #e0f0e6",display:"grid",gridTemplateColumns:"1fr 1fr auto",gap:"7px",alignItems:"center"}}>
             <span style={{fontSize:"12px",color:"#1a3a25",fontFamily:mono}}>{u.nombre}</span>
