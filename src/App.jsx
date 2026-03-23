@@ -1,4 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import PedidosOnlineTab from "./PedidosOnlineTab.jsx";
 
 // ===================== STORAGE =====================
 const stateRegistry = new Map(); // key → setValue
@@ -1919,6 +1920,7 @@ export default function App() {
     { label: "Caja Diaria", icon: "💵" },
     { label: "Caja", icon: "📊" },
     ...(currentUser?.isAdmin ? [{ label: "Usuarios", icon: "👥" }] : []),
+    { label: "Pedidos Online", icon: "📲" },
   ];
 
   const SB_BG   = "#0d1f14";
@@ -2005,6 +2007,7 @@ export default function App() {
           {tab === 8 && <CajaDiariaTab cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} presets={cajaPresets || []} setPresets={setCajaPresets} />}
           {tab === 9 && <CajaBancoTab costosFijos={costosFijos} pagos={pagos} proveedores={proveedores || []} pagosP={pagosP} mesKey={mesKey} cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} banco={banco} setBanco={setBanco} pedidosPendientes={pedidos} setPedidosPendientes={setPedidos} ventasDiarias={ventasDiarias} setVentasDiarias={setVentasDiarias} registros={registros || []} setRegistros={setRegistros} />}
           {tab === 10 && currentUser?.isAdmin && <UsuariosTab usuarios={usuarios} setUsuarios={setUsuarios} />}
+          {tab === (currentUser?.isAdmin ? 11 : 10) && <PedidosOnlineTab />}
         </div>
       </div>
     </div>
