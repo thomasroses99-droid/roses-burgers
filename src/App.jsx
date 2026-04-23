@@ -644,13 +644,34 @@ function BurgersTab({ burgers, setBurgers, insumos, salsas }) {
 }
 
 // ===================== PUNTO DE EQUILIBRIO =====================
-function PuntoEquilibrioTab({ burgers, costosFijos, insumos, salsas }) {
+function PuntoEquilibrioTab({ burgers, costosFijos, insumos, salsas, ventas }) {
   const [mix, setMix] = useState(() => burgers.map(b => ({ id: b.id, pct: Math.round(100 / burgers.length) })));
   useEffect(() => { setMix(burgers.map(b => ({ id: b.id, pct: Math.round(100 / burgers.length) }))); }, [burgers.length]);
+  const [autoMix, setAutoMix] = useState(true);
+
+  // Calcular mix automático desde ventas reales
+  const ventasPorBurger = (ventas || []).reduce((acc, v) => {
+    acc[v.burger_id] = (acc[v.burger_id] || 0) + v.cantidad;
+    return acc;
+  }, {});
+  const totalVendido = Object.values(ventasPorBurger).reduce((a, b) => a + b, 0);
+  const mixAutoRaw = burgers.map(b => ({
+    id: b.id,
+    pct: totalVendido > 0 ? Math.round((ventasPorBurger[b.id] || 0) / totalVendido * 100) : Math.round(100 / burgers.length),
+    unidades: ventasPorBurger[b.id] || 0,
+  }));
+  const mixAuto = [...mixAutoRaw].sort((a, b) => b.unidades - a.unidades);
+
+  const activeMix = autoMix ? mixAuto : mix;
+
   const totalFijos = costosFijos.reduce((s, c) => s + c.monto, 0);
-  const margenPond = burgers.reduce((s, b) => { const m = mix.find(v => v.id === b.id); return s + (b.precio_venta - calcCostoBurger(b, insumos, salsas)) * (m ? m.pct / 100 : 0); }, 0);
+  const margenPond = burgers.reduce((s, b) => { const m = activeMix.find(v => v.id === b.id); return s + (b.precio_venta - calcCostoBurger(b, insumos, salsas)) * (m ? m.pct / 100 : 0); }, 0);
   const unidadesPE = margenPond > 0 ? Math.ceil(totalFijos / margenPond) : 0;
-  const ventasPE = burgers.reduce((s, b) => { const m = mix.find(v => v.id === b.id); return s + b.precio_venta * (m ? m.pct / 100 : 0) * unidadesPE; }, 0);
+  const ventasPE = burgers.reduce((s, b) => { const m = activeMix.find(v => v.id === b.id); return s + b.precio_venta * (m ? m.pct / 100 : 0) * unidadesPE; }, 0);
+
+  const burgersSorted = autoMix
+    ? [...burgers].sort((a, b) => (ventasPorBurger[b.id] || 0) - (ventasPorBurger[a.id] || 0))
+    : burgers;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -662,20 +683,46 @@ function PuntoEquilibrioTab({ burgers, costosFijos, insumos, salsas }) {
       </div>
       <StatBox label={`Hamburguesas por día (26 días laborables) para cubrir costos fijos`} value={`${Math.ceil(unidadesPE / 26)} hamburgesas/día`} sub="Por debajo de este número estás perdiendo plata" warn />
       <Card>
-        <H title="Mix de ventas" />
-        {burgers.map(b => {
-          const m = mix.find(v => v.id === b.id) || { pct: 0 };
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "10px" }}>
+          <H title="Mix de ventas" />
+          <div style={{ display: "flex", gap: "6px" }}>
+            <button onClick={() => setAutoMix(true)} style={{ padding: "4px 10px", borderRadius: "6px", border: `1px solid ${autoMix ? "#1a7a3a" : "#ccc"}`, background: autoMix ? "#1a7a3a" : "#fff", color: autoMix ? "#fff" : "#666", fontSize: "10px", fontFamily: "'DM Mono', monospace", fontWeight: "700", cursor: "pointer" }}>
+              📊 Ventas reales
+            </button>
+            <button onClick={() => setAutoMix(false)} style={{ padding: "4px 10px", borderRadius: "6px", border: `1px solid ${!autoMix ? "#1a7a3a" : "#ccc"}`, background: !autoMix ? "#1a7a3a" : "#fff", color: !autoMix ? "#fff" : "#666", fontSize: "10px", fontFamily: "'DM Mono', monospace", fontWeight: "700", cursor: "pointer" }}>
+              ✏️ Manual
+            </button>
+          </div>
+        </div>
+        {autoMix && totalVendido === 0 && (
+          <div style={{ color: "#888", fontSize: "11px", fontFamily: "'DM Mono', monospace", padding: "8px 0", marginBottom: "6px" }}>
+            Sin ventas registradas — cargá ventas en la pestaña Ventas para ver el mix automático.
+          </div>
+        )}
+        {burgersSorted.map((b, idx) => {
+          const m = activeMix.find(v => v.id === b.id) || { pct: 0, unidades: 0 };
           const costo = calcCostoBurger(b, insumos, salsas);
+          const unidades = ventasPorBurger[b.id] || 0;
           return (
             <div key={b.id} style={{ padding: "9px 0", borderTop: "1px solid #d4edd9" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px" }}>
-                <span style={{ color: "#1a5c2a", fontSize: "12px" }}>🍔 {b.nombre}</span>
-                <div style={{ display: "flex", gap: "14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "5px", alignItems: "center" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  {autoMix && <span style={{ color: "#1a7a3a", fontFamily: "'DM Mono', monospace", fontSize: "10px", fontWeight: "700", minWidth: "18px" }}>#{idx + 1}</span>}
+                  <span style={{ color: "#1a5c2a", fontSize: "12px" }}>🍔 {b.nombre}</span>
+                </div>
+                <div style={{ display: "flex", gap: "14px", alignItems: "center" }}>
                   <span style={{ color: "#2a6a3a", fontSize: "10px", fontFamily: "'DM Mono', monospace" }}>Costo: {fmt(costo)} | Margen: {fmt(b.precio_venta - costo)}</span>
+                  {autoMix && <span style={{ color: "#5a8a6e", fontFamily: "'DM Mono', monospace", fontSize: "10px" }}>{unidades} uds</span>}
                   <span style={{ color: "#1a7a3a", fontFamily: "'DM Mono', monospace", fontSize: "12px", fontWeight: "700", width: "32px", textAlign: "right" }}>{m.pct}%</span>
                 </div>
               </div>
-              <input type="range" min="0" max="100" value={m.pct} onChange={e => setMix(mix.map(v => v.id === b.id ? { ...v, pct: Number(e.target.value) } : v))} style={{ width: "100%", accentColor: "#1a7a3a" }} />
+              {autoMix ? (
+                <div style={{ height: "7px", background: "#e8f5ec", borderRadius: "4px", overflow: "hidden" }}>
+                  <div style={{ width: `${m.pct}%`, height: "100%", background: idx === 0 ? "#1a7a3a" : idx < 3 ? "#4CAF50" : "#8bc49a", borderRadius: "4px", transition: "width 0.3s" }} />
+                </div>
+              ) : (
+                <input type="range" min="0" max="100" value={m.pct} onChange={e => setMix(mix.map(v => v.id === b.id ? { ...v, pct: Number(e.target.value) } : v))} style={{ width: "100%", accentColor: "#1a7a3a" }} />
+              )}
             </div>
           );
         })}
@@ -1778,7 +1825,7 @@ export default function App() {
           {tab === 0 && <InsumosTab insumos={insumos} setInsumos={setInsumos} />}
           {tab === 1 && <SalsasTab salsas={salsas} setSalsas={setSalsas} insumos={insumos} />}
           {tab === 2 && <BurgersTab burgers={burgers} setBurgers={setBurgers} insumos={insumos} salsas={salsas} />}
-          {tab === 3 && <PuntoEquilibrioTab burgers={burgers} costosFijos={costosFijos} insumos={insumos} salsas={salsas} />}
+          {tab === 3 && <PuntoEquilibrioTab burgers={burgers} costosFijos={costosFijos} insumos={insumos} salsas={salsas} ventas={ventasReg} />}
           {tab === 4 && <CostosFijosTab costosFijos={costosFijos} setCostosFijos={setCostosFijos} pagos={pagos} setPagos={setPagos} mesKey={mesKey} />}
           {tab === 5 && <ProveedoresTab proveedores={proveedores || []} setProveedores={setProveedores} pagosP={pagosP} setPagosP={setPagosP} mesKey={mesKey} />}
           {tab === 6 && <VentasTab ventas={ventasReg} setVentas={setVentasReg} burgers={burgers} insumos={insumos} salsas={salsas} />}
