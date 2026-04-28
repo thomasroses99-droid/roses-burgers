@@ -993,8 +993,16 @@ function VentasTab({ ventas, setVentas, burgers, insumos, salsas }) {
 }
 
 // ===================== STOCK =====================
-function StockTab({ insumos, ventas, burgers, salsas, stockInicial, setStockInicial }) {
-  // Calcular consumo total de cada insumo desde las ventas
+function StockTab({ insumos, ventas, burgers, salsas, stockInicial, setStockInicial, ingresosStock, setIngresosStock }) {
+  const today = new Date().toISOString().split("T")[0];
+  const [showForm, setShowForm] = useState(false);
+  const [fechaIngreso, setFechaIngreso] = useState(today);
+  const [notaIngreso, setNotaIngreso] = useState("");
+  const [cantIngresos, setCantIngresos] = useState({});
+  const [histExpanded, setHistExpanded] = useState(false);
+  const fmtFechaIng = (iso) => { try { const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; } catch { return iso; } };
+
+  // Consumo total desde ventas
   const consumoTotal = {};
   for (const v of ventas) {
     const burger = burgers.find(b => b.id === v.burger_id);
@@ -1002,6 +1010,14 @@ function StockTab({ insumos, ventas, burgers, salsas, stockInicial, setStockInic
     const consumo = calcConsumoVenta(burger, v.cantidad, salsas);
     for (const [insumoId, cant] of Object.entries(consumo)) {
       consumoTotal[insumoId] = (consumoTotal[insumoId] || 0) + cant;
+    }
+  }
+
+  // Ingresos acumulados por insumo
+  const ingresosExtras = {};
+  for (const ing of ingresosStock) {
+    for (const item of ing.items) {
+      ingresosExtras[item.insumoId] = (ingresosExtras[item.insumoId] || 0) + item.cantidad;
     }
   }
 
@@ -1018,12 +1034,29 @@ function StockTab({ insumos, ventas, burgers, salsas, stockInicial, setStockInic
   })).filter(g => g.items.length > 0);
 
   const totalInsumos = insumos.length;
-  const sinStock = insumos.filter(i => !stockInicial[i.id]).length;
+  const sinStock = insumos.filter(i => !stockInicial[i.id] && !ingresosExtras[i.id]).length;
   const enRojo = insumos.filter(i => {
-    const ini = stockInicial[i.id] || 0;
+    const ini = (stockInicial[i.id] || 0) + (ingresosExtras[i.id] || 0);
     const con = consumoTotal[i.id] || 0;
     return ini > 0 && (ini - con) / ini < 0.1;
   }).length;
+
+  function registrarIngreso() {
+    const items = Object.entries(cantIngresos)
+      .filter(([, v]) => Number(v) > 0)
+      .map(([id, cant]) => ({ insumoId: id, cantidad: Number(cant) }));
+    if (items.length === 0) return;
+    setIngresosStock(prev => [{ id: Date.now(), fecha: fechaIngreso, nota: notaIngreso.trim(), items }, ...(prev || [])]);
+    setCantIngresos({});
+    setNotaIngreso("");
+    setFechaIngreso(today);
+    setShowForm(false);
+  }
+
+  function eliminarIngreso(id) {
+    if (!confirm("¿Eliminar este ingreso?")) return;
+    setIngresosStock(prev => (prev || []).filter(i => i.id !== id));
+  }
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
@@ -1033,6 +1066,91 @@ function StockTab({ insumos, ventas, burgers, salsas, stockInicial, setStockInic
         <StatBox label="Stock crítico (<10%)" value={enRojo} warn={enRojo > 0} />
       </div>
 
+      {/* ── Ingreso de mercadería ── */}
+      <Card>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: showForm ? "14px" : "0" }}>
+          <H title="📦 Ingreso de mercadería" />
+          <button onClick={() => setShowForm(v => !v)} style={{ border: "none", borderRadius: "6px", cursor: "pointer", fontFamily: "'DM Mono', monospace", fontWeight: "700", background: showForm ? "#e8f5ec" : "#1a3a25", color: showForm ? "#1a3a25" : "#fff", fontSize: "12px", padding: "6px 14px" }}>
+            {showForm ? "Cancelar" : "+ Registrar ingreso"}
+          </button>
+        </div>
+        {showForm && (
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div style={{ display: "flex", gap: "10px", flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 140 }}>
+                <label style={{ fontSize: "10px", color: "#5a8a6e", fontWeight: "700", letterSpacing: "0.08em", display: "block", marginBottom: "4px" }}>FECHA</label>
+                <input type="date" value={fechaIngreso} onChange={e => setFechaIngreso(e.target.value)} style={{ ...IS, width: "100%" }} />
+              </div>
+              <div style={{ flex: 2, minWidth: 200 }}>
+                <label style={{ fontSize: "10px", color: "#5a8a6e", fontWeight: "700", letterSpacing: "0.08em", display: "block", marginBottom: "4px" }}>PROVEEDOR / NOTA (opcional)</label>
+                <input value={notaIngreso} onChange={e => setNotaIngreso(e.target.value)} placeholder="Ej: Pedido Proveedor X" style={{ ...IS, width: "100%" }} />
+              </div>
+            </div>
+            {bycat.map(({ cat, items }) => (
+              <div key={cat}>
+                <div style={{ fontSize: "10px", color: "#5a8a6e", fontWeight: "700", letterSpacing: "0.08em", marginBottom: "8px", textTransform: "uppercase" }}>{cat}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))", gap: "6px" }}>
+                  {items.map(ins => (
+                    <div key={ins.id} style={{ display: "flex", alignItems: "center", gap: "8px", background: cantIngresos[ins.id] > 0 ? "#e8f5ec" : "#f9f9f9", borderRadius: "8px", padding: "7px 10px", border: `1px solid ${cantIngresos[ins.id] > 0 ? "#c8e6d0" : "#eee"}` }}>
+                      <span style={{ flex: 1, fontSize: "12px", color: "#1a3a25", fontWeight: cantIngresos[ins.id] > 0 ? "700" : "400" }}>{ins.nombre}</span>
+                      <span style={{ fontSize: "10px", color: "#aaa", minWidth: 28 }}>{ins.unidad}</span>
+                      <input
+                        type="number" min="0" step="0.001" placeholder="0"
+                        value={cantIngresos[ins.id] || ""}
+                        onChange={e => setCantIngresos(p => ({ ...p, [ins.id]: e.target.value }))}
+                        style={{ ...IS, width: "70px", textAlign: "right", padding: "4px 6px", fontSize: "12px" }}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+            <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: "4px" }}>
+              <button onClick={registrarIngreso}
+                disabled={!Object.values(cantIngresos).some(v => Number(v) > 0)}
+                style={{ border: "none", borderRadius: "6px", cursor: "pointer", fontFamily: "'DM Mono', monospace", fontWeight: "700", padding: "8px 18px", background: "#1a7a3a", color: "#fff", opacity: Object.values(cantIngresos).some(v => Number(v) > 0) ? 1 : 0.4 }}>
+                ✅ Guardar ingreso
+              </button>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* ── Historial de ingresos ── */}
+      {(ingresosStock || []).length > 0 && (
+        <Card>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }} onClick={() => setHistExpanded(v => !v)}>
+            <H title={`📋 Historial de ingresos (${ingresosStock.length})`} />
+            <span style={{ fontSize: "12px", color: "#5a8a6e" }}>{histExpanded ? "▲ Ocultar" : "▼ Ver"}</span>
+          </div>
+          {histExpanded && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px" }}>
+              {(ingresosStock || []).slice(0, 30).map(ing => (
+                <div key={ing.id} style={{ background: "#f9fdf9", border: "1px solid #e0f0e8", borderRadius: "8px", padding: "10px 12px" }}>
+                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                    <div>
+                      <span style={{ fontWeight: "700", fontSize: "12px", color: "#1a3a25", fontFamily: "'DM Mono', monospace" }}>{fmtFechaIng(ing.fecha)}</span>
+                      {ing.nota && <span style={{ marginLeft: "8px", fontSize: "11px", color: "#5a8a6e" }}>{ing.nota}</span>}
+                    </div>
+                    <button onClick={() => eliminarIngreso(ing.id)} style={{ background: "transparent", border: "none", color: "#ccc", cursor: "pointer", fontSize: "14px", padding: "0 4px" }}>✕</button>
+                  </div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                    {ing.items.map(item => {
+                      const ins = insumos.find(i => i.id === item.insumoId);
+                      return (
+                        <span key={item.insumoId} style={{ background: "#e8f5ec", color: "#1a3a25", fontSize: "11px", padding: "2px 8px", borderRadius: "4px", fontFamily: "'DM Mono', monospace" }}>
+                          {ins?.nombre || item.insumoId}: +{fmtCant(item.cantidad)} {ins?.unidad || ""}
+                        </span>
+                      );
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </Card>
+      )}
+
       {bycat.map(({ cat, items }) => (
         <Card key={cat}>
           <H title={cat} />
@@ -1040,7 +1158,7 @@ function StockTab({ insumos, ventas, burgers, salsas, stockInicial, setStockInic
             <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'DM Mono', monospace", fontSize: "12px" }}>
               <thead>
                 <tr style={{ borderBottom: "2px solid #c8e6d0" }}>
-                  {["Insumo","Unidad","Stock inicial","Consumido","Stock actual","Estado"].map(h => (
+                  {["Insumo","Unidad","Stock base","Ingresos","Consumido","Stock actual","Estado"].map(h => (
                     <th key={h} style={{ padding: "7px 10px", color: "#5a8a6e", fontSize: "9px", letterSpacing: "0.1em", textAlign: h === "Insumo" ? "left" : "right", textTransform: "uppercase", fontWeight: "700" }}>{h}</th>
                   ))}
                 </tr>
@@ -1048,9 +1166,11 @@ function StockTab({ insumos, ventas, burgers, salsas, stockInicial, setStockInic
               <tbody>
                 {items.map((ins, i) => {
                   const ini = stockInicial[ins.id] || 0;
+                  const ingresos = ingresosExtras[ins.id] || 0;
                   const con = consumoTotal[ins.id] || 0;
-                  const actual = ini - con;
-                  const pctLeft = ini > 0 ? actual / ini : null;
+                  const actual = ini + ingresos - con;
+                  const base = ini + ingresos;
+                  const pctLeft = base > 0 ? actual / base : null;
                   const estado = pctLeft === null ? { label: "Sin datos", color: "#aaa", bg: "#f5f5f5" }
                     : pctLeft < 0 ? { label: "Negativo", color: "#cc0000", bg: "#fff0f0" }
                     : pctLeft < 0.1 ? { label: "Crítico", color: "#cc4400", bg: "#fff3ee" }
@@ -1062,17 +1182,16 @@ function StockTab({ insumos, ventas, burgers, salsas, stockInicial, setStockInic
                       <td style={{ padding: "8px 10px", textAlign: "right", color: "#5a8a6e" }}>{ins.unidad}</td>
                       <td style={{ padding: "8px 10px", textAlign: "right" }}>
                         <input
-                          type="number"
-                          min="0"
-                          step="0.001"
+                          type="number" min="0" step="0.001"
                           value={stockInicial[ins.id] ?? ""}
                           onChange={e => setStock(ins.id, e.target.value)}
                           placeholder="0"
                           style={{ ...IS, width: "90px", textAlign: "right", padding: "4px 7px", fontSize: "11px" }}
                         />
                       </td>
+                      <td style={{ padding: "8px 10px", textAlign: "right", color: ingresos > 0 ? "#1a7a3a" : "#bbb", fontWeight: ingresos > 0 ? "700" : "400" }}>{ingresos > 0 ? `+${fmtCant(ingresos)}` : "—"}</td>
                       <td style={{ padding: "8px 10px", textAlign: "right", color: con > 0 ? "#cc4400" : "#bbb" }}>{fmtCant(con)}</td>
-                      <td style={{ padding: "8px 10px", textAlign: "right", color: actual < 0 ? "#cc0000" : actual === 0 && ini === 0 ? "#aaa" : "#1a3a25", fontWeight: "700" }}>{ini === 0 && con === 0 ? "—" : fmtCant(actual)}</td>
+                      <td style={{ padding: "8px 10px", textAlign: "right", color: actual < 0 ? "#cc0000" : actual === 0 && base === 0 ? "#aaa" : "#1a3a25", fontWeight: "700" }}>{base === 0 && con === 0 ? "—" : fmtCant(actual)}</td>
                       <td style={{ padding: "8px 10px", textAlign: "right" }}>
                         <span style={{ background: estado.bg, color: estado.color, padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: "700" }}>{estado.label}</span>
                       </td>
@@ -1648,6 +1767,7 @@ const KEYS = {
   cajaDiaria: "hb-caja-diaria",
   cajaPresets: "hb-caja-presets",
   stockInicial: "hb-stock-inicial",
+  ingresosStock: "hb-ingresos-stock",
   ventasReg: "hb-ventas-reg",
   usuarios: "hb-users",
 };
@@ -1711,12 +1831,13 @@ export default function App() {
   const [stockInicial, setStockInicial, r11] = usePersisted(KEYS.stockInicial, {});
   const [ventasReg, setVentasReg, r12] = usePersisted(KEYS.ventasReg, []);
   const [usuarios, setUsuarios, r14] = usePersisted(KEYS.usuarios, []);
+  const [ingresosStock, setIngresosStock, r15] = usePersisted(KEYS.ingresosStock, []);
 
   const logout = () => { localStorage.removeItem(SESSION_KEY); setCurrentUser(null); };
   if (!currentUser) return <LoginScreen onLogin={u => setCurrentUser(u)} />;
   const mesKey = `${new Date().getFullYear()}-${new Date().getMonth()}`;
 
-  if (![r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,rp0,rp1].every(Boolean)) return (
+  if (![r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,r15,rp0,rp1].every(Boolean)) return (
     <div style={{ minHeight: "100vh", background: "#f0f7f2", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "12px" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;700&display=swap');`}</style>
       <div style={{ fontSize: "28px" }}>🍔</div>
@@ -1829,7 +1950,7 @@ export default function App() {
           {tab === 4 && <CostosFijosTab costosFijos={costosFijos} setCostosFijos={setCostosFijos} pagos={pagos} setPagos={setPagos} mesKey={mesKey} />}
           {tab === 5 && <ProveedoresTab proveedores={proveedores || []} setProveedores={setProveedores} pagosP={pagosP} setPagosP={setPagosP} mesKey={mesKey} />}
           {tab === 6 && <VentasTab ventas={ventasReg} setVentas={setVentasReg} burgers={burgers} insumos={insumos} salsas={salsas} />}
-          {tab === 7 && <StockTab insumos={insumos} ventas={ventasReg} burgers={burgers} salsas={salsas} stockInicial={stockInicial} setStockInicial={setStockInicial} />}
+          {tab === 7 && <StockTab insumos={insumos} ventas={ventasReg} burgers={burgers} salsas={salsas} stockInicial={stockInicial} setStockInicial={setStockInicial} ingresosStock={ingresosStock || []} setIngresosStock={setIngresosStock} />}
           {tab === 8 && <CajaDiariaTab cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} presets={cajaPresets || []} setPresets={setCajaPresets} />}
           {tab === 9 && <CajaBancoTab costosFijos={costosFijos} pagos={pagos} proveedores={proveedores || []} pagosP={pagosP} mesKey={mesKey} cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} banco={banco} setBanco={setBanco} pedidosPendientes={pedidos} setPedidosPendientes={setPedidos} ventasDiarias={ventasDiarias} setVentasDiarias={setVentasDiarias} registros={registros || []} setRegistros={setRegistros} />}
           {tab === 10 && currentUser?.isAdmin && <UsuariosTab usuarios={usuarios} setUsuarios={setUsuarios} />}
