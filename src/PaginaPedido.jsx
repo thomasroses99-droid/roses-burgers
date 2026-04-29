@@ -4,6 +4,27 @@ import { useState, useEffect, useRef } from "react";
 const WA_NUMBER = "543417408076";
 const NOMBRE_LOCAL = "Roses Burgers";
 
+const ZONAS_ENVIO = [
+  { id: "fisherton", label: "Fisherton", precio: 2500 },
+  { id: "funes",     label: "Funes",     precio: 3000 },
+];
+
+const BURGER_IMAGES = {
+  "Cheeseburger":  "/images/burgers/cheeseburger.jpg",
+  "Roses":         "/images/burgers/roses.jpg",
+  "1967":          "/images/burgers/1967.jpg",
+  "Classic":       "/images/burgers/classic.jpg",
+  "Cheese Onion":  "/images/burgers/cheese-onion.jpg",
+  "Cowboy":        "/images/burgers/cowboy.jpg",
+  "Smokey Bacon":  "/images/burgers/smokey-bacon.jpg",
+  "Blue Cheese":   "/images/burgers/blue-cheese.jpg",
+  "Stacked Onion": "/images/burgers/stacked-onion.jpg",
+  "Cheese Bacon":  "/images/burgers/cheese-bacon.jpg",
+  "Biggie Burger": "/images/burgers/biggie-burger.jpg",
+  "Crispy Garlic": "/images/burgers/crispy-garlic.jpg",
+  "Ruby Clove":    "/images/burgers/ruby-clove.jpg",
+};
+
 // Zona de delivery por defecto (polígono vacío → admin debe configurarla)
 const LS_ZONA_KEY = "rb-zona-delivery";
 const LS_MENU_KEY = "rb-menu-publico";
@@ -240,6 +261,7 @@ export default function PaginaPedido() {
   const [direccion, setDireccion] = useState("");
   const [geoCoords, setGeoCoords] = useState(null);
   const [geoStatus, setGeoStatus] = useState(null); // null | "ok" | "err" | "fuera" | "buscando"
+  const [zonaEnvio, setZonaEnvio] = useState("");
   const [pago, setPago] = useState("");
   const [notas, setNotas] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -252,10 +274,12 @@ export default function PaginaPedido() {
   ];
 
   const totalItems = Object.values(carrito).reduce((a, b) => a + b, 0);
-  const totalPrecio = Object.entries(carrito).reduce((sum, [id, qty]) => {
+  const totalProductos = Object.entries(carrito).reduce((sum, [id, qty]) => {
     const item = todasItems.find(i => String(i.id) === String(id));
     return sum + (item ? item.precio * qty : 0);
   }, 0);
+  const costoEnvio = tipo === "delivery" ? (ZONAS_ENVIO.find(z => z.id === zonaEnvio)?.precio || 0) : 0;
+  const totalPrecio = totalProductos + costoEnvio;
 
   function cambiarQty(id, delta) {
     setCarrito(prev => {
@@ -297,6 +321,7 @@ export default function PaginaPedido() {
     if (!pago) return false;
     if (tipo === "delivery") {
       if (!direccion.trim()) return false;
+      if (!zonaEnvio) return false;
       if (geoStatus === "fuera") return false;
       if (geoStatus === "buscando") return false;
     }
@@ -321,7 +346,9 @@ export default function PaginaPedido() {
     lineas.push(`📦 *Tipo:* ${tipo === "delivery" ? "🛵 Delivery" : "🏠 Retiro en local"}`);
 
     if (tipo === "delivery") {
+      const zona = ZONAS_ENVIO.find(z => z.id === zonaEnvio);
       lineas.push(`📍 *Dirección:* ${direccion}`);
+      if (zona) lineas.push(`📌 *Zona:* ${zona.label} (envío $${zona.precio.toLocaleString("es-AR")})`);
     }
 
     lineas.push(`💳 *Pago:* ${pago}`);
@@ -425,6 +452,25 @@ export default function PaginaPedido() {
             >🏠 Retiro en local</button>
           </div>
 
+          {/* Zona de envío */}
+          {tipo === "delivery" && (
+            <div style={{ marginBottom: "16px" }}>
+              <label style={S.label}>Zona de envío</label>
+              <div style={{ display: "flex", gap: "8px" }}>
+                {ZONAS_ENVIO.map(z => (
+                  <button key={z.id}
+                    style={{ ...S.toggleBtn, flex: 1, ...(zonaEnvio === z.id ? S.toggleBtnActive : {}) }}
+                    onClick={() => setZonaEnvio(z.id)}>
+                    {z.label}
+                    <div style={{ fontSize: "11px", fontWeight: "400", marginTop: "2px", color: zonaEnvio === z.id ? "#e8b84b" : "#666" }}>
+                      ${z.precio.toLocaleString("es-AR")}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Dirección + Mapa */}
           {tipo === "delivery" && (
             <div style={{ marginBottom: "16px" }}>
@@ -496,15 +542,23 @@ export default function PaginaPedido() {
 
 // ─── ItemCard ─────────────────────────────────────────────────────
 function ItemCard({ item, qty, onChange }) {
+  const imgSrc = BURGER_IMAGES[item.nombre];
   return (
-    <div style={{ ...S.card, ...(qty > 0 ? S.cardSelected : {}) }}>
-      <div style={{ flex: 1 }}>
+    <div style={{ ...S.card, ...(qty > 0 ? S.cardSelected : {}), alignItems: "center" }}>
+      {imgSrc && (
+        <img
+          src={imgSrc}
+          alt={item.nombre}
+          style={{ width: "70px", height: "70px", objectFit: "cover", borderRadius: "8px", flexShrink: 0 }}
+        />
+      )}
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div style={S.itemName}>{item.nombre}</div>
         {item.descripcion && <div style={S.itemDesc}>{item.descripcion}</div>}
+        {item.precio > 0 && (
+          <div style={{ ...S.itemPrice, marginLeft: 0, marginTop: "4px" }}>${item.precio.toLocaleString("es-AR")}</div>
+        )}
       </div>
-      {item.precio > 0 && (
-        <div style={S.itemPrice}>${item.precio.toLocaleString("es-AR")}</div>
-      )}
       <div style={S.counter}>
         {qty > 0 ? (
           <>
