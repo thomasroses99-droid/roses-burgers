@@ -253,8 +253,25 @@ function MapaDelivery({ coords, zona, onMapReady }) {
 
 // ─── Componente principal ─────────────────────────────────────────
 export default function PaginaPedido() {
-  const [menu] = useState(loadMenu);
-  const [zona] = useState(loadZona);
+  const [menu, setMenu] = useState(loadMenu);
+  const [zona, setZona] = useState(loadZona);
+
+  useEffect(() => {
+    let unsub;
+    import("./firebase.js").then(fb => {
+      unsub = fb.onSnapshot(fb.doc(fb.db, "rb", "main3"), snap => {
+        if (!snap.exists()) return;
+        const data = snap.data();
+        if (data[LS_MENU_KEY]) {
+          try { setMenu(JSON.parse(data[LS_MENU_KEY])); } catch {}
+        }
+        if (data[LS_ZONA_KEY]) {
+          try { setZona(JSON.parse(data[LS_ZONA_KEY])); } catch {}
+        }
+      });
+    }).catch(() => {});
+    return () => { if (unsub) unsub(); };
+  }, []);
   const [carrito, setCarrito] = useState({}); // { id: qty }
   const [tipo, setTipo] = useState("delivery"); // "delivery" | "retiro"
   const [nombre, setNombre] = useState("");
@@ -374,7 +391,7 @@ export default function PaginaPedido() {
     setTimeout(() => setEnviando(false), 2000);
   }
 
-  const pagoOpciones = ["Efectivo", "Transferencia", "Link de pago"];
+  const pagoOpciones = ["Efectivo", "Transferencia"];
 
   return (
     <div style={S.page}>
