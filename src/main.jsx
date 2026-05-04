@@ -10,6 +10,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<PaginaPedido />} />
         <Route path="/pedido" element={<PaginaPedido />} />
         <Route path="/admin-pedidos" element={<PaginaAdminPedidos />} />
         <Route path="/admin" element={<PaginaAdminPedidos />} />
