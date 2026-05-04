@@ -47,13 +47,13 @@ export default function PaginaEmpleado() {
   useEffect(() => {
     let unsub;
     import("./firebase.js").then(fb => {
-      fb.getDoc(fb.doc(fb.db, "rb", "main3")).then(snap => {
+      fb.onSnapshot(fb.doc(fb.db, "rb", "main3"), snap => {
         if (snap.exists()) {
           const d = snap.data();
           setBurgers(tryParse(d["hb-burgers-v2"], []));
         }
         setLoading(false);
-      }).catch(() => setLoading(false));
+      }, () => setLoading(false));
 
       unsub = fb.onSnapshot(fb.doc(fb.db, "rb", "empleado"), snap => {
         if (snap.exists()) {
@@ -243,12 +243,6 @@ export default function PaginaEmpleado() {
             <button onClick={() => delMovimiento(tipo, m.id)} style={{ background: "none", border: "none", color: "#ccc", cursor: "pointer", fontSize: "16px", padding: "0 3px", flexShrink: 0 }}>✕</button>
           </div>
         ))}
-        <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0 0", marginTop: "4px" }}>
-          <span style={{ fontSize: "11px", color: "#5a8a6e", fontFamily: mono }}>Mi saldo</span>
-          <span style={{ fontSize: "15px", fontWeight: "700", color: GREEN, fontFamily: mono }}>
-            {fmt(movs.reduce((s, m) => s + (Number(m.ingreso)||0) - (Number(m.egreso)||0), 0))}
-          </span>
-        </div>
       </>
     )
   );
@@ -274,22 +268,6 @@ export default function PaginaEmpleado() {
           >
             Salir
           </button>
-        </div>
-      </div>
-
-      {/* Summary cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", padding: "14px 16px 6px" }}>
-        <div style={{ background: "#fff", borderRadius: "11px", padding: "13px 15px", border: "1px solid #c8e6c9" }}>
-          <div style={{ fontSize: "9px", color: "#5a8a6e", textTransform: "uppercase", marginBottom: "5px" }}>💵 Efectivo</div>
-          <div style={{ fontSize: "17px", fontWeight: "700", color: saldoCaja >= 0 ? GREEN : "#cc4400" }}>{fmt(saldoCaja)}</div>
-        </div>
-        <div style={{ background: "#fff", borderRadius: "11px", padding: "13px 15px", border: "1px solid #c8e6c9" }}>
-          <div style={{ fontSize: "9px", color: "#5a8a6e", textTransform: "uppercase", marginBottom: "5px" }}>🏦 Banco</div>
-          <div style={{ fontSize: "17px", fontWeight: "700", color: saldoBanco >= 0 ? GREEN : "#cc4400" }}>{fmt(saldoBanco)}</div>
-        </div>
-        <div style={{ background: "#fff", borderRadius: "11px", padding: "13px 15px", border: "1px solid #c8e6c9" }}>
-          <div style={{ fontSize: "9px", color: "#5a8a6e", textTransform: "uppercase", marginBottom: "5px" }}>Ventas hoy</div>
-          <div style={{ fontSize: "17px", fontWeight: "700", color: GREEN }}>{fmt(totalVentasHoy)}</div>
         </div>
       </div>
 
@@ -404,12 +382,6 @@ export default function PaginaEmpleado() {
                       <button onClick={() => delVenta(v.id)} style={{ background: "none", border: "none", color: "#ccc", cursor: "pointer", fontSize: "16px", padding: "0 3px", flexShrink: 0 }}>✕</button>
                     </div>
                   ))}
-                  <div style={{ display: "flex", justifyContent: "space-between", padding: "12px 0 0", marginTop: "4px" }}>
-                    <span style={{ fontSize: "11px", color: "#5a8a6e", fontFamily: mono }}>Total mis ventas</span>
-                    <span style={{ fontSize: "15px", fontWeight: "700", color: GREEN, fontFamily: mono }}>
-                      {fmt(misVentas.reduce((s, v) => s + v.precio_unit * v.cantidad, 0))}
-                    </span>
-                  </div>
                 </>
               )}
             </div>
