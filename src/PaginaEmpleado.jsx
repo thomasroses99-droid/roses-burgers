@@ -53,7 +53,7 @@ export default function PaginaEmpleado() {
           setBurgers(tryParse(d["hb-burgers-v2"], []));
         }
         setLoading(false);
-      });
+      }).catch(() => setLoading(false));
 
       unsub = fb.onSnapshot(fb.doc(fb.db, "rb", "empleado"), snap => {
         if (snap.exists()) {
@@ -65,8 +65,8 @@ export default function PaginaEmpleado() {
           setCajaBanco(cb); bancoRef.current = cb;
           setVentas(vt); ventasRef.current = vt;
         }
-      });
-    });
+      }, () => {});
+    }).catch(() => setLoading(false));
     return () => { if (unsub) unsub(); };
   }, []);
 
