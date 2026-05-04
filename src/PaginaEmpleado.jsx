@@ -11,29 +11,30 @@ function tryParse(str, def) {
   try { return JSON.parse(str); } catch { return def; }
 }
 
-async function fbSave(cajaDiaria, cajaBanco, ventas) {
+async function fbAppend(field, newEntry) {
   const fb = await import("./firebase.js");
-  await fb.setDoc(fb.doc(fb.db, "rb", "empleado"), {
-    cajaDiaria: JSON.stringify(cajaDiaria),
-    cajaBanco: JSON.stringify(cajaBanco),
-    ventas: JSON.stringify(ventas),
-  });
+  const ref = fb.doc(fb.db, "rb", "main3");
+  const snap = await fb.getDoc(ref);
+  const current = snap.exists() ? JSON.parse(snap.data()[field] || "[]") : [];
+  await fb.updateDoc(ref, { [field]: JSON.stringify([...current, newEntry]) });
+}
+
+async function fbDelete(field, id) {
+  const fb = await import("./firebase.js");
+  const ref = fb.doc(fb.db, "rb", "main3");
+  const snap = await fb.getDoc(ref);
+  const current = snap.exists() ? JSON.parse(snap.data()[field] || "[]") : [];
+  await fb.updateDoc(ref, { [field]: JSON.stringify(current.filter(x => x.id !== id)) });
 }
 
 export default function PaginaEmpleado() {
   const [nombre, setNombre] = useState(localStorage.getItem(EMPLEADO_KEY) || "");
   const [inputNombre, setInputNombre] = useState("");
   const [tab, setTab] = useState(0);
-  const [cajaDiaria, setCajaDiaria] = useState([]);
-  const [cajaBanco, setCajaBanco] = useState([]);
-  const [ventas, setVentas] = useState([]);
   const [burgers, setBurgers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [flash, setFlash] = useState("");
-  const cajaRef = useRef([]);
-  const bancoRef = useRef([]);
-  const ventasRef = useRef([]);
 
   // Caja/Banco form
   const [concepto, setConcepto] = useState("");
@@ -47,41 +48,15 @@ export default function PaginaEmpleado() {
   useEffect(() => {
     let unsub;
     import("./firebase.js").then(fb => {
-      fb.onSnapshot(fb.doc(fb.db, "rb", "main3"), snap => {
+      unsub = fb.onSnapshot(fb.doc(fb.db, "rb", "main3"), snap => {
         if (snap.exists()) {
-          const d = snap.data();
-          setBurgers(tryParse(d["hb-burgers-v2"], []));
+          setBurgers(tryParse(snap.data()["hb-burgers-v2"], []));
         }
         setLoading(false);
       }, () => setLoading(false));
-
-      unsub = fb.onSnapshot(fb.doc(fb.db, "rb", "empleado"), snap => {
-        if (snap.exists()) {
-          const d = snap.data();
-          const cd = tryParse(d.cajaDiaria ?? d.cajaMovs, []);
-          const cb = tryParse(d.cajaBanco, []);
-          const vt = tryParse(d.ventas, []);
-          setCajaDiaria(cd); cajaRef.current = cd;
-          setCajaBanco(cb); bancoRef.current = cb;
-          setVentas(vt); ventasRef.current = vt;
-        }
-      }, () => {});
     }).catch(() => setLoading(false));
     return () => { if (unsub) unsub(); };
   }, []);
-
-  const save = async (newCaja, newBanco, newVentas) => {
-    setSaving(true);
-    try {
-      await fbSave(newCaja, newBanco, newVentas);
-      setFlash("✓ Guardado");
-      setTimeout(() => setFlash(""), 1500);
-    } catch {
-      setFlash("⚠ Error al guardar");
-      setTimeout(() => setFlash(""), 3000);
-    }
-    setSaving(false);
-  };
 
   const addMovimiento = async (tipo) => {
     if (!concepto.trim() || (!ingreso && !egreso)) return;
@@ -93,29 +68,25 @@ export default function PaginaEmpleado() {
       egreso: Number(egreso) || 0,
       empleado: nombre,
     };
-    if (tipo === "caja") {
-      const n = [...cajaRef.current, entry];
-      cajaRef.current = n; setCajaDiaria(n);
-      setConcepto(""); setIngreso(""); setEgreso("");
-      await save(n, bancoRef.current, ventasRef.current);
-    } else {
-      const n = [...bancoRef.current, entry];
-      bancoRef.current = n; setCajaBanco(n);
-      setConcepto(""); setIngreso(""); setEgreso("");
-      await save(cajaRef.current, n, ventasRef.current);
+    const field = tipo === "caja" ? "hb-caja-diaria" : "hb-caja-banco-movs";
+    setConcepto(""); setIngreso(""); setEgreso("");
+    setSaving(true);
+    try {
+      await fbAppend(field, entry);
+      setFlash("✓ Guardado");
+      setTimeout(() => setFlash(""), 1500);
+    } catch {
+      setFlash("⚠ Error al guardar");
+      setTimeout(() => setFlash(""), 3000);
     }
+    setSaving(false);
   };
 
   const delMovimiento = async (tipo, id) => {
-    if (tipo === "caja") {
-      const n = cajaRef.current.filter(m => m.id !== id);
-      cajaRef.current = n; setCajaDiaria(n);
-      await save(n, bancoRef.current, ventasRef.current);
-    } else {
-      const n = bancoRef.current.filter(m => m.id !== id);
-      bancoRef.current = n; setCajaBanco(n);
-      await save(cajaRef.current, n, ventasRef.current);
-    }
+    const field = tipo === "caja" ? "hb-caja-diaria" : "hb-caja-banco-movs";
+    setSaving(true);
+    try { await fbDelete(field, id); } catch {}
+    setSaving(false);
   };
 
   const addVenta = async () => {
@@ -130,16 +101,23 @@ export default function PaginaEmpleado() {
       precio_unit: b.precio_venta || 0,
       empleado: nombre,
     };
-    const n = [...ventasRef.current, entry];
-    ventasRef.current = n; setVentas(n);
     setCantidad("1"); setBurgerId("");
-    await save(cajaRef.current, bancoRef.current, n);
+    setSaving(true);
+    try {
+      await fbAppend("hb-ventas-reg", entry);
+      setFlash("✓ Guardado");
+      setTimeout(() => setFlash(""), 1500);
+    } catch {
+      setFlash("⚠ Error al guardar");
+      setTimeout(() => setFlash(""), 3000);
+    }
+    setSaving(false);
   };
 
   const delVenta = async (id) => {
-    const n = ventasRef.current.filter(v => v.id !== id);
-    ventasRef.current = n; setVentas(n);
-    await save(cajaRef.current, bancoRef.current, n);
+    setSaving(true);
+    try { await fbDelete("hb-ventas-reg", id); } catch {}
+    setSaving(false);
   };
 
   const GREEN = "#1a7a3a";
@@ -199,14 +177,6 @@ export default function PaginaEmpleado() {
       </div>
     );
   }
-
-  const misCaja = cajaDiaria.filter(m => m.empleado === nombre);
-  const misBanco = cajaBanco.filter(m => m.empleado === nombre);
-  const misVentas = ventas.filter(v => v.empleado === nombre);
-
-  const saldoCaja = misCaja.reduce((s, m) => s + (Number(m.ingreso)||0) - (Number(m.egreso)||0), 0);
-  const saldoBanco = misBanco.reduce((s, m) => s + (Number(m.ingreso)||0) - (Number(m.egreso)||0), 0);
-  const totalVentasHoy = misVentas.filter(v => v.fecha === fmtHoy()).reduce((s, v) => s + v.precio_unit * v.cantidad, 0);
 
   const selectedBurger = burgers.find(b => b.id === Number(burgerId));
 
@@ -312,15 +282,6 @@ export default function PaginaEmpleado() {
               </div>
             </div>
 
-            <div style={cardSt}>
-              <div style={{ fontWeight: "700", fontSize: "14px", color: "#1a3a25", marginBottom: "12px" }}>
-                Mis movimientos
-                <span style={{ fontWeight: "400", fontSize: "11px", color: "#8aba9e", marginLeft: "8px" }}>
-                  ({(tab === 0 ? misCaja : misBanco).length})
-                </span>
-              </div>
-              <MovsList movs={tab === 0 ? misCaja : misBanco} tipo={tab === 0 ? "caja" : "banco"} />
-            </div>
           </>
         )}
 
@@ -363,28 +324,6 @@ export default function PaginaEmpleado() {
               )}
             </div>
 
-            <div style={cardSt}>
-              <div style={{ fontWeight: "700", fontSize: "14px", color: "#1a3a25", marginBottom: "12px" }}>
-                Mis ventas
-                <span style={{ fontWeight: "400", fontSize: "11px", color: "#8aba9e", marginLeft: "8px" }}>({misVentas.length})</span>
-              </div>
-              {misVentas.length === 0 ? (
-                <div style={{ textAlign: "center", padding: "24px 0", color: "#8aba9e", fontSize: "12px", fontFamily: mono }}>Sin ventas registradas</div>
-              ) : (
-                <>
-                  {[...misVentas].reverse().map(v => (
-                    <div key={v.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "11px 0", borderBottom: "1px solid #e8f5ec" }}>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: "13px", color: "#1a3a25", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{v.burger_nombre}</div>
-                        <div style={{ fontSize: "10px", color: "#8aba9e" }}>{v.fecha} · ×{v.cantidad}</div>
-                      </div>
-                      <div style={{ color: GREEN, fontWeight: "700", fontSize: "13px", flexShrink: 0 }}>{fmt(v.precio_unit * v.cantidad)}</div>
-                      <button onClick={() => delVenta(v.id)} style={{ background: "none", border: "none", color: "#ccc", cursor: "pointer", fontSize: "16px", padding: "0 3px", flexShrink: 0 }}>✕</button>
-                    </div>
-                  ))}
-                </>
-              )}
-            </div>
           </>
         )}
       </div>
