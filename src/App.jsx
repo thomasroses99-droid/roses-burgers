@@ -696,6 +696,7 @@ function BurgersTab({ burgers, setBurgers, insumos, salsas }) {
   // ── Ingredientes base compartidos ─────────────────────────────────
   const [showBase, setShowBase] = useState(true);
   const [newBaseRef, setNewBaseRef] = useState("");
+  const [newBaseTipo, setNewBaseTipo] = useState("insumo");
   const [newBaseSoloPapas, setNewBaseSoloPapas] = useState(false);
   const [baseIng, setBaseIng] = useState(() => {
     const findCant = (sufijo, refId) => {
@@ -794,10 +795,17 @@ function BurgersTab({ burgers, setBurgers, insumos, salsas }) {
               </div>
             ))}
             {/* Agregar nuevo ingrediente base */}
-            <div style={{ display: "flex", gap: "7px", alignItems: "center", marginTop: "10px", borderTop: "1px solid #eaf5ea", paddingTop: "10px" }}>
-              <select value={newBaseRef} onChange={e => setNewBaseRef(e.target.value)} style={{ ...IS, flex: 1 }}>
-                <option value="">-- Agregar insumo a la base --</option>
-                {insumos.map(ins => <option key={ins.id} value={ins.id}>{ins.nombre} ({ins.unidad})</option>)}
+            <div style={{ display: "flex", gap: "7px", alignItems: "center", flexWrap: "wrap", marginTop: "10px", borderTop: "1px solid #eaf5ea", paddingTop: "10px" }}>
+              <select value={newBaseTipo} onChange={e => { setNewBaseTipo(e.target.value); setNewBaseRef(""); }} style={{ ...IS, width: "90px" }}>
+                <option value="insumo">Insumo</option>
+                <option value="salsa">Receta</option>
+              </select>
+              <select value={newBaseRef} onChange={e => setNewBaseRef(e.target.value)} style={{ ...IS, flex: 1, minWidth: 140 }}>
+                <option value="">-- Elegir {newBaseTipo === "salsa" ? "receta" : "insumo"} --</option>
+                {newBaseTipo === "insumo"
+                  ? insumos.map(ins => <option key={ins.id} value={ins.id}>{ins.nombre} ({ins.unidad})</option>)
+                  : salsas.map(s => <option key={s.id} value={s.id}>{s.nombre} ({s.rendTipo === "unidad" ? "unidad" : "kg"})</option>)
+                }
               </select>
               <label style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "10px", fontFamily: mono, cursor: "pointer", whiteSpace: "nowrap" }}>
                 <input type="checkbox" checked={newBaseSoloPapas} onChange={e => setNewBaseSoloPapas(e.target.checked)} />
@@ -805,9 +813,16 @@ function BurgersTab({ burgers, setBurgers, insumos, salsas }) {
               </label>
               <Btn onClick={() => {
                 if (!newBaseRef) return;
-                const ins = insumos.find(i => i.id === Number(newBaseRef));
-                if (!ins) return;
-                setBaseIng(prev => [...prev, { id: Date.now(), tipo: "insumo", ref_id: ins.id, nombre: ins.nombre, unidad: ins.unidad, cantSimple: 0, cantDoble: 0, cantTriple: 0, soloPapas: newBaseSoloPapas }]);
+                if (newBaseTipo === "insumo") {
+                  const ins = insumos.find(i => i.id === Number(newBaseRef));
+                  if (!ins) return;
+                  setBaseIng(prev => [...prev, { id: Date.now(), tipo: "insumo", ref_id: ins.id, nombre: ins.nombre, unidad: ins.unidad, cantSimple: 0, cantDoble: 0, cantTriple: 0, soloPapas: newBaseSoloPapas }]);
+                } else {
+                  const s = salsas.find(x => x.id === Number(newBaseRef));
+                  if (!s) return;
+                  const unidad = s.rendTipo === "unidad" ? "unidad" : "kg";
+                  setBaseIng(prev => [...prev, { id: Date.now(), tipo: "salsa", ref_id: s.id, nombre: s.nombre, unidad, cantSimple: 0, cantDoble: 0, cantTriple: 0, soloPapas: newBaseSoloPapas }]);
+                }
                 setNewBaseRef(""); setNewBaseSoloPapas(false);
               }} variant="ghost">+ Agregar</Btn>
             </div>
