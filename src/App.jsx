@@ -5,6 +5,7 @@ import PedidosOnlineTab from "./PedidosOnlineTab.jsx";
 const stateRegistry = new Map(); // key → setValue
 let firestore = null;
 let syncTimer = null;
+let fbReady = false; // true after first Firebase snapshot — prevents overwriting newer data on startup
 
 // Callbacks para notificar estado de conexión a la UI
 let onFbConnected = null;
@@ -34,14 +35,15 @@ import("./firebase.js").then(fb => {
         } catch {}
       }
     }
+    fbReady = true;
   }, () => { if (onFbConnected) onFbConnected(false); });
 }).catch(() => { if (onFbConnected) onFbConnected(false); });
 
 function scheduleSync() {
-  if (!firestore) return;
+  if (!firestore || !fbReady) return;
   clearTimeout(syncTimer);
   syncTimer = setTimeout(() => {
-    if (!firestore) return;
+    if (!firestore || !fbReady) return;
     const data = {};
     for (const key of stateRegistry.keys()) {
       const v = localStorage.getItem(key);
@@ -431,7 +433,7 @@ function SalsasTab({ salsas, setSalsas, insumos }) {
   return (
     <div style={{ display: "flex", gap: "14px" }}>
       <div style={{ width: "190px", flexShrink: 0 }}>
-        <div style={{ color: "#222", fontSize: "10px", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", marginBottom: "7px", letterSpacing: "0.1em" }}>Salsas</div>
+        <div style={{ color: "#222", fontSize: "10px", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", marginBottom: "7px", letterSpacing: "0.1em" }}>Recetas</div>
         {salsas.map((s, i) => (
           <div key={s.id} style={{ display: "flex", gap: "4px", marginBottom: "4px" }}>
             <button onClick={() => setSel(i)} style={{ flex: 1, background: sel === i ? "#1a7a3a" : "#d4edd9", color: sel === i ? "#d4edd9" : "#aaa", border: `1px solid ${sel === i ? "#1a7a3a" : "#222"}`, borderRadius: "7px", padding: "8px 11px", textAlign: "left", cursor: "pointer", fontFamily: "'DM Mono', monospace", fontSize: "11px", fontWeight: sel === i ? "700" : "400" }}>🧪 {s.nombre}</button>
@@ -445,7 +447,7 @@ function SalsasTab({ salsas, setSalsas, insumos }) {
             <div style={{ display: "flex", gap: "5px" }}><Btn onClick={addS} style={{ flex: 1 }}>Crear</Btn><Btn onClick={() => setShowNew(false)} variant="ghost" style={{ flex: 1 }}>✕</Btn></div>
           </Card>
         ) : (
-          <button onClick={() => setShowNew(true)} style={{ width: "100%", background: "transparent", color: "#222", border: "1px dashed #a0c0a0", borderRadius: "7px", padding: "8px", cursor: "pointer", fontFamily: "'DM Mono', monospace", fontSize: "10px", marginTop: "4px" }}>+ Nueva salsa</button>
+          <button onClick={() => setShowNew(true)} style={{ width: "100%", background: "transparent", color: "#222", border: "1px dashed #a0c0a0", borderRadius: "7px", padding: "8px", cursor: "pointer", fontFamily: "'DM Mono', monospace", fontSize: "10px", marginTop: "4px" }}>+ Nueva receta</button>
         )}
       </div>
 
@@ -496,12 +498,209 @@ function SalsasTab({ salsas, setSalsas, insumos }) {
   );
 }
 
+// ===================== PRODUCCION =====================
+function ProduccionTab({ salsas, insumos, produccion, setProduccion, ventas, burgers }) {
+  const today = new Date().toISOString().split("T")[0];
+  const [selSalsa, setSelSalsa] = useState(salsas[0]?.id || "");
+  const [cantGr, setCantGr] = useState("");
+  const [fecha, setFecha] = useState(today);
+  const [nota, setNota] = useState("");
+  const [histExpanded, setHistExpanded] = useState(false);
+
+  const fmtFecha = (iso) => { try { const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; } catch { return iso; } };
+  const fmtGr = (kg) => { const gr = Math.round(kg * 1000); return gr >= 1000 ? `${(gr/1000).toFixed(2)} kg` : `${gr} gr`; };
+
+  const stockPorReceta = salsas.map(s => {
+    const producidoKg = (produccion || []).filter(p => p.salsa_id === s.id).reduce((acc, p) => acc + p.cantidadKg, 0);
+    const consumidoKg = (ventas || []).reduce((acc, v) => {
+      const burger = burgers.find(b => b.id === v.burger_id);
+      if (!burger) return acc;
+      const salsaIngs = burger.ingredientes.filter(i => i.tipo === "salsa" && i.ref_id === s.id);
+      return acc + salsaIngs.reduce((a, i) => a + i.cantidad * v.cantidad, 0);
+    }, 0);
+    const actualKg = producidoKg - consumidoKg;
+    const pctLeft = producidoKg > 0 ? actualKg / producidoKg : null;
+    const estado = pctLeft === null ? { label: "Sin producción", color: "#aaa", bg: "#f5f5f5" }
+      : pctLeft < 0 ? { label: "Negativo", color: "#cc0000", bg: "#fff0f0" }
+      : pctLeft < 0.1 ? { label: "Crítico", color: "#cc4400", bg: "#fff3ee" }
+      : pctLeft < 0.25 ? { label: "Bajo", color: "#e67e00", bg: "#fffbee" }
+      : { label: "OK", color: "#1a7a3a", bg: "#f0faf4" };
+    return { ...s, producidoKg, consumidoKg, actualKg, estado };
+  });
+
+  const registrar = () => {
+    if (!selSalsa || !cantGr || Number(cantGr) <= 0) return;
+    setProduccion(prev => [{
+      id: Date.now(),
+      fecha,
+      salsa_id: Number(selSalsa),
+      cantidadKg: Number(cantGr) / 1000,
+      nota: nota.trim(),
+    }, ...(prev || [])]);
+    setCantGr("");
+    setNota("");
+  };
+
+  const salsaSeleccionada = salsas.find(s => s.id === Number(selSalsa));
+  const pesoTotalReceta = salsaSeleccionada ? calcPesoTotalSalsa(salsaSeleccionada) : 0;
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+      <Card>
+        <H title="Stock de recetas" />
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'DM Mono', monospace", fontSize: "12px" }}>
+            <thead>
+              <tr style={{ borderBottom: "2px solid #c8e6d0" }}>
+                {["Receta","Producido","Consumido","Stock actual","Estado"].map(h => (
+                  <th key={h} style={{ padding: "7px 10px", color: "#5a8a6e", fontSize: "9px", letterSpacing: "0.1em", textAlign: h === "Receta" ? "left" : "right", textTransform: "uppercase", fontWeight: "700" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {stockPorReceta.map((s, i) => (
+                <tr key={s.id} style={{ borderBottom: "1px solid #e8f5ec", background: i % 2 === 0 ? "#fafffe" : "#ffffff" }}>
+                  <td style={{ padding: "8px 10px", color: "#1a3a25" }}>🧪 {s.nombre}</td>
+                  <td style={{ padding: "8px 10px", textAlign: "right", color: s.producidoKg > 0 ? "#1a7a3a" : "#bbb", fontWeight: s.producidoKg > 0 ? "700" : "400" }}>{s.producidoKg > 0 ? fmtGr(s.producidoKg) : "—"}</td>
+                  <td style={{ padding: "8px 10px", textAlign: "right", color: s.consumidoKg > 0 ? "#cc4400" : "#bbb" }}>{s.consumidoKg > 0 ? fmtGr(s.consumidoKg) : "—"}</td>
+                  <td style={{ padding: "8px 10px", textAlign: "right", color: s.actualKg < 0 ? "#cc0000" : s.producidoKg === 0 ? "#aaa" : "#1a3a25", fontWeight: "700" }}>{s.producidoKg === 0 && s.consumidoKg === 0 ? "—" : fmtGr(s.actualKg)}</td>
+                  <td style={{ padding: "8px 10px", textAlign: "right" }}>
+                    <span style={{ background: s.estado.bg, color: s.estado.color, padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: "700" }}>{s.estado.label}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      <Card>
+        <H title="🥘 Registrar producción" />
+        <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "end" }}>
+          <div>
+            <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>FECHA</div>
+            <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} style={{ ...IS, width: "140px" }} />
+          </div>
+          <div style={{ flex: "1 1 160px" }}>
+            <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>RECETA</div>
+            <select value={selSalsa} onChange={e => setSelSalsa(e.target.value)} style={{ ...IS, width: "100%" }}>
+              {salsas.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+            </select>
+          </div>
+          <div>
+            <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>GRAMOS PRODUCIDOS</div>
+            <input type="number" min="1" placeholder="500" value={cantGr} onChange={e => setCantGr(e.target.value)} style={{ ...IS, width: "140px" }} />
+          </div>
+          <div style={{ flex: "2 1 180px" }}>
+            <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>NOTA (opcional)</div>
+            <input placeholder="Ej: producción del día" value={nota} onChange={e => setNota(e.target.value)} style={{ ...IS, width: "100%" }} />
+          </div>
+          <Btn onClick={registrar}>+ Registrar</Btn>
+        </div>
+        {salsaSeleccionada && Number(cantGr) > 0 && (() => {
+          const factor = pesoTotalReceta > 0 ? (Number(cantGr) / 1000) / pesoTotalReceta : 0;
+          return (
+            <div style={{ marginTop: "12px", padding: "10px", background: "#fff3ee", borderRadius: "7px" }}>
+              <div style={{ color: "#cc4400", fontSize: "10px", fontFamily: "'DM Mono', monospace", marginBottom: "7px" }}>INSUMOS A DESCONTAR DEL STOCK</div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                {salsaSeleccionada.ingredientes.map((ing, i) => {
+                  const ins = insumos.find(x => x.id === ing.insumo_id);
+                  const cantConsumir = ing.cantidad * factor * 1000;
+                  return (
+                    <span key={i} style={{ background: "#ffe8e0", color: "#cc4400", fontSize: "11px", padding: "3px 9px", borderRadius: "4px", fontFamily: "'DM Mono', monospace" }}>
+                      {ins?.nombre || "?"}: -{cantConsumir.toFixed(1)} gr
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          );
+        })()}
+      </Card>
+
+      {(produccion || []).length > 0 && (
+        <Card>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer" }} onClick={() => setHistExpanded(v => !v)}>
+            <H title={`📋 Historial de producción (${(produccion || []).length})`} />
+            <span style={{ fontSize: "12px", color: "#5a8a6e" }}>{histExpanded ? "▲ Ocultar" : "▼ Ver"}</span>
+          </div>
+          {histExpanded && (
+            <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "12px" }}>
+              {(produccion || []).slice(0, 50).map(prod => {
+                const salsa = salsas.find(s => s.id === prod.salsa_id);
+                return (
+                  <div key={prod.id} style={{ background: "#f9fdf9", border: "1px solid #e0f0e8", borderRadius: "8px", padding: "10px 12px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                    <div>
+                      <span style={{ fontWeight: "700", fontSize: "12px", color: "#1a3a25", fontFamily: "'DM Mono', monospace" }}>{fmtFecha(prod.fecha)}</span>
+                      <span style={{ marginLeft: "10px", fontSize: "12px", color: "#2a6a3a" }}>🧪 {salsa?.nombre || "?"}</span>
+                      {prod.nota && <span style={{ marginLeft: "8px", fontSize: "11px", color: "#5a8a6e" }}>{prod.nota}</span>}
+                    </div>
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      <span style={{ color: "#1a7a3a", fontFamily: "'DM Mono', monospace", fontSize: "12px", fontWeight: "700" }}>+{fmtGr(prod.cantidadKg)}</span>
+                      <button onClick={() => { if (confirm("¿Eliminar esta producción?")) setProduccion(prev => (prev || []).filter(p => p.id !== prod.id)); }} style={{ background: "transparent", border: "none", color: "#ccc", cursor: "pointer", fontSize: "14px", padding: "0 4px" }}>✕</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Card>
+      )}
+    </div>
+  );
+}
+
 // ===================== HAMBURGUESAS =====================
 function BurgersTab({ burgers, setBurgers, insumos, salsas }) {
+  const mono = "'DM Mono', monospace";
   const [sel, setSel] = useState(0);
   const [showNew, setShowNew] = useState(false);
   const [nf, setNf] = useState({ nombre: "", precio_venta: "" });
   const [ni, setNi] = useState({ tipo: "insumo", ref_id: insumos[0]?.id || "", cantidad: "", merma_pct: 0 });
+
+  // ── Ingredientes base compartidos ─────────────────────────────────
+  const [showBase, setShowBase] = useState(true);
+  const [newBaseRef, setNewBaseRef] = useState("");
+  const [newBaseSoloPapas, setNewBaseSoloPapas] = useState(false);
+  const [baseIng, setBaseIng] = useState(() => {
+    const findCant = (sufijo, refId) => {
+      const b = burgers.find(b => b.nombre.includes(sufijo));
+      return b?.ingredientes.find(i => i.ref_id === refId)?.cantidad ?? null;
+    };
+    return [
+      { id: 1, tipo: "insumo", ref_id: 1,  nombre: "Carne",       unidad: "kg",     cantSimple: findCant("- Simple", 1)  ?? 0.1,  cantDoble: findCant("- Doble", 1)  ?? 0.2,  cantTriple: findCant("- Triple", 1)  ?? 0.3,  soloPapas: false },
+      { id: 2, tipo: "insumo", ref_id: 33, nombre: "Pan",          unidad: "unidad", cantSimple: findCant("- Simple", 33) ?? 1,    cantDoble: findCant("- Doble", 33) ?? 1,    cantTriple: findCant("- Triple", 33) ?? 1,    soloPapas: false },
+      { id: 3, tipo: "insumo", ref_id: 5,  nombre: "Cheddar",      unidad: "kg",     cantSimple: findCant("- Simple", 5)  ?? 0.04, cantDoble: findCant("- Doble", 5)  ?? 0.08, cantTriple: findCant("- Triple", 5)  ?? 0.12, soloPapas: false },
+      { id: 4, tipo: "insumo", ref_id: 46, nombre: "Papas Fritas", unidad: "kg",     cantSimple: findCant("- Simple con papas", 46) ?? 0.15, cantDoble: findCant("- Doble con papas", 46) ?? 0.15, cantTriple: findCant("- Triple con papas", 46) ?? 0.15, soloPapas: true },
+    ];
+  });
+
+  function aplicarBase() {
+    setBurgers(prev => prev.map(b => {
+      const n = b.nombre;
+      let tamano = null;
+      let conPapas = false;
+      if (/- Simple con papas$/i.test(n))      { tamano = "Simple"; conPapas = true; }
+      else if (/- Doble con papas$/i.test(n))  { tamano = "Doble";  conPapas = true; }
+      else if (/- Triple con papas$/i.test(n)) { tamano = "Triple"; conPapas = true; }
+      else if (/- Simple$/i.test(n))           { tamano = "Simple"; }
+      else if (/- Doble$/i.test(n))            { tamano = "Doble";  }
+      else if (/- Triple$/i.test(n))           { tamano = "Triple"; }
+      if (!tamano) return b;
+      let ings = [...b.ingredientes];
+      for (const base of baseIng) {
+        if (base.soloPapas && !conPapas) continue;
+        const cant = base[`cant${tamano}`];
+        const idx = ings.findIndex(i => i.ref_id === base.ref_id && i.tipo === base.tipo);
+        if (idx >= 0) {
+          ings = ings.map((ing, ii) => ii === idx ? { ...ing, cantidad: cant } : ing);
+        } else {
+          ings = [...ings, { tipo: base.tipo, ref_id: base.ref_id, nombre: base.nombre, cantidad: cant, unidad: base.unidad, merma_pct: 0 }];
+        }
+      }
+      return { ...b, ingredientes: ings };
+    }));
+  }
 
   const burger = burgers[sel];
   const costoTotal = burger ? calcCostoBurger(burger, insumos, salsas) : 0;
@@ -525,7 +724,63 @@ function BurgersTab({ burgers, setBurgers, insumos, salsas }) {
   const updI = (idx, f, v) => setBurgers(burgers.map((b, i) => i !== sel ? b : { ...b, ingredientes: b.ingredientes.map((ing, ii) => ii !== idx ? ing : { ...ing, [f]: ["cantidad", "merma_pct"].includes(f) ? Number(v) : v }) }));
 
   return (
-    <div style={{ display: "flex", gap: "14px" }}>
+    <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+      {/* ── Ingredientes Base Compartidos ── */}
+      <Card style={{ padding: "14px 16px" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: showBase ? "14px" : 0 }}>
+          <span style={{ fontSize: "11px", fontFamily: mono, textTransform: "uppercase", letterSpacing: "0.1em", color: "#1a5c2a", fontWeight: 700 }}>Ingredientes Base Compartidos</span>
+          <button onClick={() => setShowBase(s => !s)} style={{ background: "none", border: "none", color: "#5a8a6e", cursor: "pointer", fontFamily: mono, fontSize: "10px" }}>{showBase ? "▲ ocultar" : "▼ mostrar"}</button>
+        </div>
+        {showBase && (
+          <>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 80px 80px 80px 130px auto", gap: "6px", alignItems: "center", borderBottom: "1px solid #d4edd9", paddingBottom: "6px", marginBottom: "8px" }}>
+              {["Ingrediente", "Simple", "Doble", "Triple", "Aplica a", ""].map((h, i) => (
+                <div key={i} style={{ fontSize: "9px", fontFamily: mono, textTransform: "uppercase", color: "#1a5c2a" }}>{h}</div>
+              ))}
+            </div>
+            {baseIng.map((ing, idx) => (
+              <div key={ing.id} style={{ display: "grid", gridTemplateColumns: "1fr 80px 80px 80px 130px auto", gap: "6px", alignItems: "center", marginBottom: "6px" }}>
+                <div style={{ fontSize: "11px", fontFamily: mono }}>{ing.nombre} <span style={{ color: "#aaa", fontSize: "9px" }}>({ing.unidad})</span></div>
+                {["cantSimple", "cantDoble", "cantTriple"].map(field => (
+                  <input key={field} type="number" value={ing[field]} step="0.01" min="0"
+                    onChange={e => setBaseIng(prev => prev.map((x, i) => i !== idx ? x : { ...x, [field]: Number(e.target.value) }))}
+                    style={{ ...IS, textAlign: "right" }} />
+                ))}
+                <label style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "10px", fontFamily: mono, cursor: "pointer" }}>
+                  <input type="checkbox" checked={ing.soloPapas}
+                    onChange={e => setBaseIng(prev => prev.map((x, i) => i !== idx ? x : { ...x, soloPapas: e.target.checked }))} />
+                  <span style={{ color: ing.soloPapas ? "#1a7a3a" : "#888" }}>{ing.soloPapas ? "solo con papas" : "todas"}</span>
+                </label>
+                <X onClick={() => setBaseIng(prev => prev.filter((_, i) => i !== idx))} />
+              </div>
+            ))}
+            {/* Agregar nuevo ingrediente base */}
+            <div style={{ display: "flex", gap: "7px", alignItems: "center", marginTop: "10px", borderTop: "1px solid #eaf5ea", paddingTop: "10px" }}>
+              <select value={newBaseRef} onChange={e => setNewBaseRef(e.target.value)} style={{ ...IS, flex: 1 }}>
+                <option value="">-- Agregar insumo a la base --</option>
+                {insumos.map(ins => <option key={ins.id} value={ins.id}>{ins.nombre} ({ins.unidad})</option>)}
+              </select>
+              <label style={{ display: "flex", alignItems: "center", gap: "5px", fontSize: "10px", fontFamily: mono, cursor: "pointer", whiteSpace: "nowrap" }}>
+                <input type="checkbox" checked={newBaseSoloPapas} onChange={e => setNewBaseSoloPapas(e.target.checked)} />
+                Solo con papas
+              </label>
+              <Btn onClick={() => {
+                if (!newBaseRef) return;
+                const ins = insumos.find(i => i.id === Number(newBaseRef));
+                if (!ins) return;
+                setBaseIng(prev => [...prev, { id: Date.now(), tipo: "insumo", ref_id: ins.id, nombre: ins.nombre, unidad: ins.unidad, cantSimple: 0, cantDoble: 0, cantTriple: 0, soloPapas: newBaseSoloPapas }]);
+                setNewBaseRef(""); setNewBaseSoloPapas(false);
+              }} variant="ghost">+ Agregar</Btn>
+            </div>
+            <Btn onClick={aplicarBase} style={{ width: "100%", marginTop: "12px" }}>
+              Aplicar a TODAS las hamburguesas
+            </Btn>
+          </>
+        )}
+      </Card>
+
+      {/* ── Editor de hamburguesas ── */}
+      <div style={{ display: "flex", gap: "14px" }}>
       <div style={{ width: "190px", flexShrink: 0 }}>
         <div style={{ color: "#222", fontSize: "10px", fontFamily: "'DM Mono', monospace", textTransform: "uppercase", marginBottom: "7px", letterSpacing: "0.1em" }}>Hamburguesas</div>
         {burgers.map((b, i) => (
@@ -607,7 +862,7 @@ function BurgersTab({ burgers, setBurgers, insumos, salsas }) {
               <div style={{ display: "flex", gap: "7px", flexWrap: "wrap", alignItems: "center" }}>
                 <select value={ni.tipo} onChange={e => setNi({ ...ni, tipo: e.target.value, ref_id: e.target.value === "insumo" ? (insumos[0]?.id || "") : (salsas[0]?.id || "") })} style={{ ...IS, width: "90px" }}>
                   <option value="insumo">Insumo</option>
-                  <option value="salsa">Salsa</option>
+                  <option value="salsa">Receta</option>
                 </select>
                 <select value={ni.ref_id} onChange={e => setNi({ ...ni, ref_id: e.target.value })} style={{ ...IS, flex: "1 1 130px" }}>{refs().map(x => <option key={x.id} value={x.id}>{x.nombre}</option>)}</select>
                 <input type="number" step="0.001" placeholder="Cantidad" value={ni.cantidad} onChange={e => setNi({ ...ni, cantidad: e.target.value })} style={{ ...IS, width: "85px" }} />
@@ -640,6 +895,7 @@ function BurgersTab({ burgers, setBurgers, insumos, salsas }) {
           </Card>
         </div>
       )}
+      </div>
     </div>
   );
 }
@@ -910,6 +1166,12 @@ function VentasTab({ ventas, setVentas, burgers, insumos, salsas }) {
   const totalVentas = ventas.reduce((s, v) => s + v.precio_unit * v.cantidad, 0);
   const totalUnidades = ventas.reduce((s, v) => s + v.cantidad, 0);
 
+  const exportCSV = () => {
+    const rows = [["Fecha","Hamburguesa","Cantidad","Precio unit","Subtotal","Empleado"],...ventas.map(v=>[v.fecha,`"${v.burger_nombre}"`,v.cantidad,v.precio_unit,v.precio_unit*v.cantidad,v.empleado||""])].map(r=>r.join(",")).join("\n");
+    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(new Blob([rows], { type:"text/csv;charset=utf-8;" })), download:`ventas-${new Date().toISOString().split("T")[0]}.csv` });
+    a.click(); URL.revokeObjectURL(a.href);
+  };
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "9px" }}>
@@ -948,7 +1210,7 @@ function VentasTab({ ventas, setVentas, burgers, insumos, salsas }) {
 
       <Card>
         <H title="Ventas registradas">
-          {ventas.length > 0 && <Btn variant="secondary" onClick={() => { if (window.confirm("¿Borrar todas las ventas?")) setVentas([]); }}>Limpiar</Btn>}
+          {ventas.length > 0 && <><Btn variant="secondary" style={{ fontSize:"10px" }} onClick={exportCSV}>⬇ CSV</Btn><Btn variant="secondary" onClick={() => { if (window.confirm("¿Borrar todas las ventas?")) setVentas([]); }}>Limpiar</Btn></>}
         </H>
         {ventas.length > 0 ? (
           <>
@@ -994,7 +1256,7 @@ function VentasTab({ ventas, setVentas, burgers, insumos, salsas }) {
 }
 
 // ===================== STOCK =====================
-function StockTab({ insumos, ventas, burgers, salsas, stockInicial, setStockInicial, ingresosStock, setIngresosStock }) {
+function StockTab({ insumos, ventas, burgers, salsas, stockInicial, setStockInicial, ingresosStock, setIngresosStock, produccion }) {
   const today = new Date().toISOString().split("T")[0];
   const [showForm, setShowForm] = useState(false);
   const [fechaIngreso, setFechaIngreso] = useState(today);
@@ -1003,16 +1265,32 @@ function StockTab({ insumos, ventas, burgers, salsas, stockInicial, setStockInic
   const [histExpanded, setHistExpanded] = useState(false);
   const fmtFechaIng = (iso) => { try { const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; } catch { return iso; } };
 
-  // Consumo total desde ventas
-  const consumoTotal = {};
+  // Consumo de insumos desde ventas (solo ingredientes directos, NO expandiendo recetas)
+  const consumoVentas = {};
   for (const v of ventas) {
     const burger = burgers.find(b => b.id === v.burger_id);
     if (!burger) continue;
-    const consumo = calcConsumoVenta(burger, v.cantidad, salsas);
-    for (const [insumoId, cant] of Object.entries(consumo)) {
-      consumoTotal[insumoId] = (consumoTotal[insumoId] || 0) + cant;
+    for (const ing of burger.ingredientes) {
+      if (ing.tipo !== "insumo") continue;
+      const cant = ing.cantidad * (1 + (ing.merma_pct || 0) / 100) * v.cantidad;
+      consumoVentas[ing.ref_id] = (consumoVentas[ing.ref_id] || 0) + cant;
     }
   }
+  // Consumo de insumos desde producción de recetas
+  const consumoProduccion = {};
+  for (const prod of (produccion || [])) {
+    const salsa = salsas.find(s => s.id === prod.salsa_id);
+    if (!salsa) continue;
+    const pesoTotal = calcPesoTotalSalsa(salsa);
+    const factor = pesoTotal > 0 ? prod.cantidadKg / pesoTotal : 0;
+    for (const ing of salsa.ingredientes) {
+      consumoProduccion[ing.insumo_id] = (consumoProduccion[ing.insumo_id] || 0) + ing.cantidad * factor;
+    }
+  }
+  // Total consumo de insumos
+  const consumoTotal = {};
+  for (const [id, cant] of Object.entries(consumoVentas)) consumoTotal[id] = (consumoTotal[id] || 0) + cant;
+  for (const [id, cant] of Object.entries(consumoProduccion)) consumoTotal[id] = (consumoTotal[id] || 0) + cant;
 
   // Ingresos acumulados por insumo
   const ingresosExtras = {};
@@ -1204,6 +1482,52 @@ function StockTab({ insumos, ventas, burgers, salsas, stockInicial, setStockInic
           </div>
         </Card>
       ))}
+
+      {/* ── Stock de recetas ── */}
+      <Card>
+        <H title="🧪 Recetas" />
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: "'DM Mono', monospace", fontSize: "12px" }}>
+            <thead>
+              <tr style={{ borderBottom: "2px solid #c8e6d0" }}>
+                {["Receta","Producido","Consumido (ventas)","Stock actual","Estado"].map(h => (
+                  <th key={h} style={{ padding: "7px 10px", color: "#5a8a6e", fontSize: "9px", letterSpacing: "0.1em", textAlign: h === "Receta" ? "left" : "right", textTransform: "uppercase", fontWeight: "700" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {salsas.map((s, i) => {
+                const producidoKg = (produccion || []).filter(p => p.salsa_id === s.id).reduce((acc, p) => acc + p.cantidadKg, 0);
+                const consumidoKg = ventas.reduce((acc, v) => {
+                  const burger = burgers.find(b => b.id === v.burger_id);
+                  if (!burger) return acc;
+                  const salsaIngs = burger.ingredientes.filter(ing => ing.tipo === "salsa" && ing.ref_id === s.id);
+                  return acc + salsaIngs.reduce((a, ing) => a + ing.cantidad * v.cantidad, 0);
+                }, 0);
+                const actualKg = producidoKg - consumidoKg;
+                const pctLeft = producidoKg > 0 ? actualKg / producidoKg : null;
+                const estado = pctLeft === null ? { label: "Sin producción", color: "#aaa", bg: "#f5f5f5" }
+                  : pctLeft < 0 ? { label: "Negativo", color: "#cc0000", bg: "#fff0f0" }
+                  : pctLeft < 0.1 ? { label: "Crítico", color: "#cc4400", bg: "#fff3ee" }
+                  : pctLeft < 0.25 ? { label: "Bajo", color: "#e67e00", bg: "#fffbee" }
+                  : { label: "OK", color: "#1a7a3a", bg: "#f0faf4" };
+                const fmtKg = (kg) => { const gr = Math.round(kg * 1000); return gr >= 1000 ? `${(gr/1000).toFixed(2)} kg` : `${gr} gr`; };
+                return (
+                  <tr key={s.id} style={{ borderBottom: "1px solid #e8f5ec", background: i % 2 === 0 ? "#fafffe" : "#ffffff" }}>
+                    <td style={{ padding: "8px 10px", color: "#1a3a25" }}>🧪 {s.nombre}</td>
+                    <td style={{ padding: "8px 10px", textAlign: "right", color: producidoKg > 0 ? "#1a7a3a" : "#bbb", fontWeight: producidoKg > 0 ? "700" : "400" }}>{producidoKg > 0 ? fmtKg(producidoKg) : "—"}</td>
+                    <td style={{ padding: "8px 10px", textAlign: "right", color: consumidoKg > 0 ? "#cc4400" : "#bbb" }}>{consumidoKg > 0 ? fmtKg(consumidoKg) : "—"}</td>
+                    <td style={{ padding: "8px 10px", textAlign: "right", color: actualKg < 0 ? "#cc0000" : producidoKg === 0 ? "#aaa" : "#1a3a25", fontWeight: "700" }}>{producidoKg === 0 && consumidoKg === 0 ? "—" : fmtKg(actualKg)}</td>
+                    <td style={{ padding: "8px 10px", textAlign: "right" }}>
+                      <span style={{ background: estado.bg, color: estado.color, padding: "2px 8px", borderRadius: "4px", fontSize: "10px", fontWeight: "700" }}>{estado.label}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
     </div>
   );
 }
@@ -1219,16 +1543,21 @@ function CajaDiariaTab({ cajaDiaria, setCajaDiaria, presets, setPresets }) {
   const [rDesde, setRDesde] = useState("");
   const [rHasta, setRHasta] = useState("");
   const [rConcepto, setRConcepto] = useState("");
+  const [tipo, setTipo] = useState("efectivo");
+  const [categoria, setCategoria] = useState("");
 
   const movs = cajaDiaria || [];
   const prs = presets || [];
 
-  let acum = 0;
+  let acumEfectivo = 0, acumBanco = 0;
   const rows = movs.map(mov => {
-    acum += (Number(mov.ingreso) || 0) - (Number(mov.egreso) || 0);
-    return { ...mov, saldo: acum };
+    const t = mov.tipo || "efectivo";
+    if (t === "efectivo") acumEfectivo += (Number(mov.ingreso)||0) - (Number(mov.egreso)||0);
+    else acumBanco += (Number(mov.ingreso)||0) - (Number(mov.egreso)||0);
+    return { ...mov, tipo: t, saldo: t === "efectivo" ? acumEfectivo : acumBanco };
   });
-  const saldoFinal = rows.length > 0 ? rows[rows.length - 1].saldo : 0;
+  const saldoEfectivo = acumEfectivo;
+  const saldoBanco = acumBanco;
   const totalIngresos = movs.reduce((s, m) => s + (Number(m.ingreso) || 0), 0);
   const totalEgresos = movs.reduce((s, m) => s + (Number(m.egreso) || 0), 0);
 
@@ -1237,7 +1566,7 @@ function CajaDiariaTab({ cajaDiaria, setCajaDiaria, presets, setPresets }) {
 
   const add = () => {
     if (!concepto.trim() || (!ingreso && !egreso)) return;
-    setCajaDiaria([...movs, { id: Date.now(), fecha: fmtFecha(fecha), concepto: concepto.trim(), ingreso: Number(ingreso) || 0, egreso: Number(egreso) || 0 }]);
+    setCajaDiaria([...movs, { id: Date.now(), fecha: fmtFecha(fecha), concepto: concepto.trim(), ingreso: Number(ingreso) || 0, egreso: Number(egreso) || 0, tipo, categoria }]);
     setConcepto(""); setIngreso(""); setEgreso("");
   };
 
@@ -1273,6 +1602,12 @@ function CajaDiariaTab({ cajaDiaria, setCajaDiaria, presets, setPresets }) {
   // Todos los conceptos usados (para el filtro)
   const conceptosUsados = [...new Set(movs.map(m => m.concepto))].sort();
 
+  const exportCajaCSV = () => {
+    const rows = [["Fecha","Tipo","Concepto","Categoria","Ingreso","Egreso"],...movs.map(m=>[m.fecha,m.tipo||"efectivo",`"${m.concepto}"`,m.categoria||"",m.ingreso||0,m.egreso||0])].map(r=>r.join(",")).join("\n");
+    const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(new Blob([rows], { type:"text/csv;charset=utf-8;" })), download:`caja-${new Date().toISOString().split("T")[0]}.csv` });
+    a.click(); URL.revokeObjectURL(a.href);
+  };
+
   const mono = "'DM Mono', monospace";
   const chipStyle = (active) => ({ display: "inline-flex", alignItems: "center", gap: "5px", padding: "4px 10px", borderRadius: "20px", fontSize: "11px", fontFamily: mono, cursor: "pointer", border: `1px solid ${active ? "#1a7a3a" : "#c8e6c9"}`, background: active ? "#1a7a3a" : "#f0faf4", color: active ? "#fff" : "#2a5a3a", transition: "all 0.1s" });
 
@@ -1280,8 +1615,9 @@ function CajaDiariaTab({ cajaDiaria, setCajaDiaria, presets, setPresets }) {
     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
 
       {/* ── Resumen ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "9px" }}>
-        <StatBox label="Efectivo disponible" value={fmt(saldoFinal)} accent={saldoFinal >= 0} warn={saldoFinal < 0} sub="Alimenta solapa Caja" />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "9px" }}>
+        <StatBox label="💵 Efectivo disponible" value={fmt(saldoEfectivo)} accent={saldoEfectivo >= 0} warn={saldoEfectivo < 0} sub="Alimenta solapa Caja" />
+        <StatBox label="🏦 Banco disponible" value={fmt(saldoBanco)} accent={saldoBanco >= 0} warn={saldoBanco < 0} sub="Alimenta solapa Caja" />
         <StatBox label="Total ingresos" value={fmt(totalIngresos)} accent />
         <StatBox label="Total egresos" value={fmt(totalEgresos)} warn={totalEgresos > 0} />
       </div>
@@ -1311,7 +1647,17 @@ function CajaDiariaTab({ cajaDiaria, setCajaDiaria, presets, setPresets }) {
       {/* ── Nuevo movimiento ── */}
       <Card>
         <H title="Nuevo movimiento" />
-        <div style={{ display: "grid", gridTemplateColumns: "140px 2fr 1fr 1fr auto", gap: "8px", alignItems: "end" }}>
+        <div style={{ marginBottom: "10px" }}>
+          <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: mono, marginBottom: "5px" }}>TIPO DE MOVIMIENTO</div>
+          <div style={{ display: "flex", gap: "6px" }}>
+            {["efectivo", "banco"].map(t => (
+              <button key={t} type="button" onClick={() => setTipo(t)} style={{ padding: "5px 16px", borderRadius: "20px", fontSize: "11px", cursor: "pointer", fontFamily: mono, background: tipo === t ? (t === "efectivo" ? "#1a7a3a" : "#1565c0") : "#f0faf4", color: tipo === t ? "#fff" : "#5a8a6e", border: `1px solid ${tipo === t ? (t === "efectivo" ? "#1a7a3a" : "#1565c0") : "#c8e6c9"}`, fontWeight: tipo === t ? "700" : "400" }}>
+                {t === "efectivo" ? "💵 Efectivo" : "🏦 Banco"}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "120px 2fr 1fr 1fr 1fr auto", gap: "8px", alignItems: "end" }}>
           <div>
             <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: mono, marginBottom: "4px" }}>FECHA</div>
             <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} style={{ ...IS, width: "100%" }} />
@@ -1319,6 +1665,13 @@ function CajaDiariaTab({ cajaDiaria, setCajaDiaria, presets, setPresets }) {
           <div>
             <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: mono, marginBottom: "4px" }}>CONCEPTO</div>
             <input placeholder="Descripción o seleccioná arriba..." value={concepto} onChange={e => setConcepto(e.target.value)} onKeyDown={e => e.key === "Enter" && add()} style={{ ...IS, width: "100%" }} />
+          </div>
+          <div>
+            <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: mono, marginBottom: "4px" }}>CATEGORÍA</div>
+            <select value={categoria} onChange={e => setCategoria(e.target.value)} style={{ ...IS, width: "100%" }}>
+              <option value="">Sin categoría</option>
+              {["Materia Prima","Sueldos","Alquiler","Servicios","Retiro dueño","Marketing","Mantenimiento","Otro"].map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
           </div>
           <div>
             <div style={{ color: "#1a7a3a", fontSize: "9px", fontFamily: mono, marginBottom: "4px" }}>↑ INGRESO $</div>
@@ -1335,14 +1688,14 @@ function CajaDiariaTab({ cajaDiaria, setCajaDiaria, presets, setPresets }) {
       {/* ── Tabla de movimientos ── */}
       <Card>
         <H title="Movimientos registrados">
-          {movs.length > 0 && <Btn variant="secondary" onClick={() => { if (window.confirm("¿Borrar todos los movimientos?")) setCajaDiaria([]); }}>Limpiar todo</Btn>}
+          {movs.length > 0 && <><Btn variant="secondary" style={{ fontSize:"10px" }} onClick={exportCajaCSV}>⬇ CSV</Btn><Btn variant="secondary" onClick={() => { if (window.confirm("¿Borrar todos los movimientos?")) setCajaDiaria([]); }}>Limpiar todo</Btn></>}
         </H>
         {rows.length > 0 ? (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: mono, fontSize: "12px" }}>
               <thead>
                 <tr style={{ borderBottom: "2px solid #c8e6d0" }}>
-                  {[{l:"Fecha",a:"left"},{l:"Concepto",a:"left"},{l:"Ingreso",a:"right"},{l:"Egreso",a:"right"},{l:"Saldo",a:"right"},{l:"",a:"center"}].map(c => (
+                  {[{l:"Fecha",a:"left"},{l:"Tipo",a:"center"},{l:"Concepto",a:"left"},{l:"Cat.",a:"left"},{l:"Ingreso",a:"right"},{l:"Egreso",a:"right"},{l:"Saldo",a:"right"},{l:"",a:"center"}].map(c => (
                     <th key={c.l} style={{ padding: "8px 10px", color: "#5a8a6e", fontWeight: "700", fontSize: "9px", letterSpacing: "0.1em", textAlign: c.a, textTransform: "uppercase" }}>{c.l}</th>
                   ))}
                 </tr>
@@ -1351,7 +1704,9 @@ function CajaDiariaTab({ cajaDiaria, setCajaDiaria, presets, setPresets }) {
                 {rows.map((r, i) => (
                   <tr key={r.id} style={{ borderBottom: "1px solid #e8f5ec", background: i % 2 === 0 ? "#fafffe" : "#fff" }}>
                     <td style={{ padding: "9px 10px", color: "#5a8a6e", fontSize: "10px", whiteSpace: "nowrap" }}>{r.fecha}</td>
+                    <td style={{ padding: "9px 6px", textAlign: "center" }}><span style={{ background: r.tipo === "banco" ? "#e3f2fd" : "#e8f5e9", color: r.tipo === "banco" ? "#1565c0" : "#1a7a3a", padding: "2px 7px", borderRadius: "10px", fontSize: "9px", fontFamily: mono, fontWeight: "700" }}>{r.tipo === "banco" ? "🏦" : "💵"}</span></td>
                     <td style={{ padding: "9px 10px", color: "#1a3a25" }}>{r.concepto}</td>
+                    <td style={{ padding: "9px 10px", color: "#5a8a6e", fontSize: "10px", whiteSpace: "nowrap" }}>{r.categoria || "—"}</td>
                     <td style={{ padding: "9px 10px", textAlign: "right", color: r.ingreso > 0 ? "#1a7a3a" : "#bbb", fontWeight: r.ingreso > 0 ? "700" : "400" }}>{r.ingreso > 0 ? fmt(r.ingreso) : "—"}</td>
                     <td style={{ padding: "9px 10px", textAlign: "right", color: r.egreso > 0 ? "#cc4400" : "#bbb", fontWeight: r.egreso > 0 ? "700" : "400" }}>{r.egreso > 0 ? fmt(r.egreso) : "—"}</td>
                     <td style={{ padding: "9px 10px", textAlign: "right", color: r.saldo >= 0 ? "#1a5c2a" : "#cc4400", fontWeight: "700" }}>{fmt(r.saldo)}</td>
@@ -1361,10 +1716,13 @@ function CajaDiariaTab({ cajaDiaria, setCajaDiaria, presets, setPresets }) {
               </tbody>
               <tfoot>
                 <tr style={{ borderTop: "2px solid #c8e6d0" }}>
-                  <td colSpan={2} style={{ padding: "10px", color: "#5a8a6e", fontFamily: mono, fontSize: "11px", fontWeight: "700" }}>SALDO FINAL</td>
+                  <td colSpan={4} style={{ padding: "10px", color: "#5a8a6e", fontFamily: mono, fontSize: "11px", fontWeight: "700" }}>SALDO FINAL</td>
                   <td style={{ padding: "10px", textAlign: "right", color: "#1a7a3a", fontWeight: "700", fontSize: "13px" }}>{fmt(totalIngresos)}</td>
                   <td style={{ padding: "10px", textAlign: "right", color: "#cc4400", fontWeight: "700", fontSize: "13px" }}>{fmt(totalEgresos)}</td>
-                  <td style={{ padding: "10px", textAlign: "right", color: saldoFinal >= 0 ? "#1a7a3a" : "#cc4400", fontWeight: "700", fontSize: "15px" }}>{fmt(saldoFinal)}</td>
+                  <td style={{ padding: "10px", textAlign: "right" }}>
+                    <div style={{ color: "#1a7a3a", fontFamily: mono, fontSize: "12px", fontWeight: "700" }}>💵 {fmt(saldoEfectivo)}</div>
+                    <div style={{ color: "#1565c0", fontFamily: mono, fontSize: "12px", fontWeight: "700" }}>🏦 {fmt(saldoBanco)}</div>
+                  </td>
                   <td />
                 </tr>
               </tfoot>
@@ -1456,23 +1814,16 @@ function CajaDiariaTab({ cajaDiaria, setCajaDiaria, presets, setPresets }) {
 
 function CajaBancoTab({ costosFijos, pagos, proveedores, pagosP, mesKey, cajaDiaria, setCajaDiaria, banco, setBanco, pedidosPendientes, setPedidosPendientes, ventasDiarias, setVentasDiarias, registros, setRegistros }) {
   const [ventasHoy, setVentasHoy] = useState("");
-  const [concepto, setConcepto] = useState("");
-  const [ingreso, setIngreso] = useState("");
-  const [egreso, setEgreso] = useState("");
-  const todayISO = new Date().toISOString().split("T")[0];
-  const [fechaMov, setFechaMov] = useState(todayISO);
 
   const movs = cajaDiaria || [];
-  let acum = 0;
-  const movRows = movs.map(m => { acum += (Number(m.ingreso) || 0) - (Number(m.egreso) || 0); return { ...m, saldo: acum }; });
-  const saldoCajaDiaria = movRows.length > 0 ? movRows[movRows.length - 1].saldo : 0;
-  const fmtFechaMov = (iso) => { const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; };
-
-  const addMov = () => {
-    if (!concepto.trim() || (!ingreso && !egreso)) return;
-    setCajaDiaria([...movs, { id: Date.now(), fecha: fmtFechaMov(fechaMov), concepto: concepto.trim(), ingreso: Number(ingreso) || 0, egreso: Number(egreso) || 0 }]);
-    setConcepto(""); setIngreso(""); setEgreso("");
-  };
+  let acumEfectivo = 0, acumBanco = 0;
+  movs.forEach(m => {
+    const t = m.tipo || "efectivo";
+    if (t === "efectivo") acumEfectivo += (Number(m.ingreso)||0) - (Number(m.egreso)||0);
+    else acumBanco += (Number(m.ingreso)||0) - (Number(m.egreso)||0);
+  });
+  const saldoCajaDiaria = acumEfectivo;
+  const saldoBancoCalculado = acumBanco;
 
   const totalFijos = costosFijos.reduce((s, c) => s + c.monto, 0);
   const totalFijosPagado = costosFijos.filter(c => pagos[`${mesKey}-${c.id}`]).reduce((s, c) => s + c.monto, 0);
@@ -1482,7 +1833,7 @@ function CajaBancoTab({ costosFijos, pagos, proveedores, pagosP, mesKey, cajaDia
   const totalProvPagado = (proveedores || []).filter(p => pagosP[`${mesKey}-p-${p.id}`]).reduce((s, p) => s + p.deuda, 0);
   const provPendientes = totalProveedores - totalProvPagado;
 
-  const disponible = saldoCajaDiaria + (Number(banco) || 0) + (Number(pedidosPendientes) || 0);
+  const disponible = saldoCajaDiaria + saldoBancoCalculado + (Number(pedidosPendientes) || 0);
   const totalObligaciones = fijosPendientes + provPendientes;
   const posNeta = disponible - totalObligaciones;
   const despuesProveedores = disponible - provPendientes;
@@ -1507,9 +1858,14 @@ function CajaBancoTab({ costosFijos, pagos, proveedores, pagosP, mesKey, cajaDia
               <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>💵 Caja efectivo</div>
               <div style={{ ...IS, width: "100%", background: "#e8f5e9", color: "#1a7a3a", fontWeight: "700", display: "flex", alignItems: "center" }}>{fmt(saldoCajaDiaria)}</div>
             </div>
-            {[["🏦 Banco", banco, setBanco], ["📦 Pedidos pendientes", pedidosPendientes, setPedidosPendientes]].map(([lbl, v, sv]) => (
-              <div key={lbl}><div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>{lbl}</div><input type="number" placeholder="$" value={v} onChange={e => sv(e.target.value)} style={{ ...IS, width: "100%" }} /></div>
-            ))}
+            <div>
+              <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>🏦 Banco</div>
+              <div style={{ ...IS, width: "100%", background: "#e3f2fd", color: "#1565c0", fontWeight: "700", display: "flex", alignItems: "center" }}>{fmt(saldoBancoCalculado)}</div>
+            </div>
+            <div>
+              <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>📦 Pedidos pendientes</div>
+              <input type="number" placeholder="$" value={pedidosPendientes} onChange={e => setPedidosPendientes(e.target.value)} style={{ ...IS, width: "100%" }} />
+            </div>
           </div>
         </Card>
 
@@ -1581,74 +1937,21 @@ function CajaBancoTab({ costosFijos, pagos, proveedores, pagosP, mesKey, cajaDia
         </Card>
       </div>
 
-      {/* ── COLUMNA DERECHA: caja diaria ── */}
-      <div style={{ width: "340px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
+      {/* ── COLUMNA DERECHA: saldos en tiempo real ── */}
+      <div style={{ width: "280px", flexShrink: 0, display: "flex", flexDirection: "column", gap: "12px" }}>
 
-        {/* Saldo actual grande */}
         <div style={{ background: saldoCajaDiaria >= 0 ? "#1a7a3a" : "#cc4400", borderRadius: "11px", padding: "20px 18px", textAlign: "center" }}>
           <div style={{ color: "rgba(255,255,255,0.7)", fontSize: "9px", letterSpacing: "0.15em", fontFamily: "'DM Mono', monospace", marginBottom: "6px", textTransform: "uppercase" }}>💵 Efectivo en caja</div>
           <div style={{ color: "#ffffff", fontSize: "36px", fontWeight: "700", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>{fmt(saldoCajaDiaria)}</div>
-          <div style={{ color: "rgba(255,255,255,0.6)", fontSize: "10px", fontFamily: "'DM Mono', monospace", marginTop: "6px" }}>{movs.length} movimiento{movs.length !== 1 ? "s" : ""}</div>
+          <div style={{ color: "rgba(255,255,255,0.6)", fontSize: "10px", fontFamily: "'DM Mono', monospace", marginTop: "6px" }}>desde Caja Diaria</div>
         </div>
 
-        {/* Formulario agregar movimiento */}
-        <Card>
-          <H title="Nuevo movimiento" />
-          <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-            <div>
-              <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "3px" }}>FECHA</div>
-              <input type="date" value={fechaMov} onChange={e => setFechaMov(e.target.value)} style={{ ...IS, width: "100%" }} />
-            </div>
-            <div>
-              <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "3px" }}>CONCEPTO</div>
-              <input placeholder="Descripción..." value={concepto} onChange={e => setConcepto(e.target.value)} onKeyDown={e => e.key === "Enter" && addMov()} style={{ ...IS, width: "100%" }} />
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "8px" }}>
-              <div>
-                <div style={{ color: "#1a7a3a", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "3px" }}>↑ INGRESO $</div>
-                <input type="number" placeholder="0" value={ingreso} onChange={e => setIngreso(e.target.value)} onKeyDown={e => e.key === "Enter" && addMov()} style={{ ...IS, width: "100%" }} />
-              </div>
-              <div>
-                <div style={{ color: "#cc4400", fontSize: "9px", fontFamily: "'DM Mono', monospace", marginBottom: "3px" }}>↓ EGRESO $</div>
-                <input type="number" placeholder="0" value={egreso} onChange={e => setEgreso(e.target.value)} onKeyDown={e => e.key === "Enter" && addMov()} style={{ ...IS, width: "100%" }} />
-              </div>
-            </div>
-            <Btn onClick={addMov} style={{ width: "100%" }}>+ Agregar movimiento</Btn>
-          </div>
-        </Card>
+        <div style={{ background: saldoBancoCalculado >= 0 ? "#1565c0" : "#cc4400", borderRadius: "11px", padding: "20px 18px", textAlign: "center" }}>
+          <div style={{ color: "rgba(255,255,255,0.7)", fontSize: "9px", letterSpacing: "0.15em", fontFamily: "'DM Mono', monospace", marginBottom: "6px", textTransform: "uppercase" }}>🏦 Saldo banco</div>
+          <div style={{ color: "#ffffff", fontSize: "36px", fontWeight: "700", fontFamily: "'DM Mono', monospace", lineHeight: 1 }}>{fmt(saldoBancoCalculado)}</div>
+          <div style={{ color: "rgba(255,255,255,0.6)", fontSize: "10px", fontFamily: "'DM Mono', monospace", marginTop: "6px" }}>desde Caja Diaria</div>
+        </div>
 
-        {/* Lista de movimientos */}
-        <Card>
-          <H title="Movimientos del día">
-            {movs.length > 0 && <Btn variant="secondary" style={{ fontSize: "10px", padding: "4px 8px" }} onClick={() => { if (window.confirm("¿Borrar todos los movimientos?")) setCajaDiaria([]); }}>Limpiar</Btn>}
-          </H>
-          {movRows.length > 0 ? (
-            <div style={{ display: "flex", flexDirection: "column", gap: "0px" }}>
-              {movRows.map((r, i) => (
-                <div key={r.id} style={{ display: "flex", alignItems: "center", gap: "6px", padding: "8px 0", borderBottom: "1px solid #e8f5ec" }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ color: "#1a3a25", fontSize: "11px", fontFamily: "'DM Mono', monospace", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{r.concepto}</div>
-                    <div style={{ color: "#8aba9e", fontSize: "9px", fontFamily: "'DM Mono', monospace" }}>{r.fecha}</div>
-                  </div>
-                  <div style={{ textAlign: "right", flexShrink: 0 }}>
-                    {r.ingreso > 0 && <div style={{ color: "#1a7a3a", fontFamily: "'DM Mono', monospace", fontSize: "11px", fontWeight: "700" }}>+{fmt(r.ingreso)}</div>}
-                    {r.egreso > 0 && <div style={{ color: "#cc4400", fontFamily: "'DM Mono', monospace", fontSize: "11px", fontWeight: "700" }}>-{fmt(r.egreso)}</div>}
-                    <div style={{ color: r.saldo >= 0 ? "#1a5c2a" : "#cc4400", fontFamily: "'DM Mono', monospace", fontSize: "10px" }}>{fmt(r.saldo)}</div>
-                  </div>
-                  <X onClick={() => setCajaDiaria(movs.filter(m => m.id !== r.id))} />
-                </div>
-              ))}
-              <div style={{ display: "flex", justifyContent: "space-between", padding: "10px 0 0", marginTop: "2px" }}>
-                <span style={{ color: "#5a8a6e", fontFamily: "'DM Mono', monospace", fontSize: "10px" }}>Saldo final</span>
-                <span style={{ color: saldoCajaDiaria >= 0 ? "#1a7a3a" : "#cc4400", fontFamily: "'DM Mono', monospace", fontSize: "14px", fontWeight: "700" }}>{fmt(saldoCajaDiaria)}</span>
-              </div>
-            </div>
-          ) : (
-            <div style={{ textAlign: "center", padding: "24px 0", color: "#8aba9e", fontFamily: "'DM Mono', monospace", fontSize: "11px" }}>
-              Sin movimientos.<br />Agregá un ingreso o egreso.
-            </div>
-          )}
-        </Card>
       </div>
 
     </div>
@@ -1771,6 +2074,7 @@ const KEYS = {
   ingresosStock: "hb-ingresos-stock",
   ventasReg: "hb-ventas-reg",
   usuarios: "hb-users",
+  produccion: "hb-produccion",
 };
 
 function exportarDatos() {
@@ -1809,6 +2113,671 @@ function importarDatos(archivo, onDone) {
   reader.readAsText(archivo);
 }
 
+// ===================== REPORTES =====================
+function ReportesTab({ ventasReg, cajaDiaria, costosFijos, burgers, insumos, salsas, ingresosStock }) {
+  const [subTab, setSubTab] = useState(0);
+  const [cmvDesde, setCmvDesde] = useState("");
+  const [cmvHasta, setCmvHasta] = useState("");
+  const mono = "'DM Mono', monospace";
+
+  const ventas = ventasReg || [];
+  const movs = cajaDiaria || [];
+  const ingresos = ingresosStock || [];
+
+  const parseDMY = (str) => { try { const [d,m,y] = str.split("/"); return new Date(Number(y), Number(m)-1, Number(d)); } catch { return null; } };
+  const getMesKey = (str) => { try { const p = str.split("/"); return `${p[2]}-${p[1].padStart(2,"0")}`; } catch { return ""; } };
+  const getMesLabel = (key) => { if (!key) return ""; const [y,m] = key.split("-"); const n=["","Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"]; return `${n[Number(m)]||m} ${y}`; };
+
+  // ventas enriquecidas con costo
+  const ventasC = ventas.map(v => {
+    const b = burgers.find(x => x.id === v.burger_id);
+    const costo = b ? calcCostoBurger(b, insumos, salsas) * (v.cantidad || 0) : 0;
+    const revenue = (v.precio_unit || 0) * (v.cantidad || 0);
+    return { ...v, costo, revenue };
+  });
+
+  const totalRevenue = ventasC.reduce((s,v) => s + v.revenue, 0);
+  const totalCMVteo = ventasC.reduce((s,v) => s + v.costo, 0);
+  const totalMargen = totalRevenue - totalCMVteo;
+  const totalUnidades = ventas.reduce((s,v) => s + (v.cantidad||0), 0);
+  const diasConVentas = new Set(ventas.map(v => v.fecha)).size;
+
+  // ranking por burger
+  const porBurger = {};
+  for (const v of ventasC) {
+    if (!porBurger[v.burger_nombre]) porBurger[v.burger_nombre] = { nombre: v.burger_nombre, unidades:0, revenue:0, costo:0 };
+    porBurger[v.burger_nombre].unidades += v.cantidad||0;
+    porBurger[v.burger_nombre].revenue += v.revenue;
+    porBurger[v.burger_nombre].costo += v.costo;
+  }
+  const rankingBurgers = Object.values(porBurger).sort((a,b) => b.unidades - a.unidades);
+
+  // Comparativa semanal (lun-dom)
+  const todayD = new Date();
+  const dow = todayD.getDay() === 0 ? 6 : todayD.getDay() - 1;
+  const startThisWeek = new Date(todayD); startThisWeek.setDate(todayD.getDate() - dow); startThisWeek.setHours(0,0,0,0);
+  const startLastWeek = new Date(startThisWeek); startLastWeek.setDate(startThisWeek.getDate() - 7);
+  const endLastWeek = new Date(startThisWeek); endLastWeek.setMilliseconds(-1);
+  const thisWeekV = ventasC.filter(v => { const d=parseDMY(v.fecha); return d && d>=startThisWeek; });
+  const lastWeekV = ventasC.filter(v => { const d=parseDMY(v.fecha); return d && d>=startLastWeek && d<=endLastWeek; });
+  const weekRank = (arr) => { const m={}; for (const v of arr) { if (!m[v.burger_nombre]) m[v.burger_nombre]={unidades:0,revenue:0}; m[v.burger_nombre].unidades+=v.cantidad||0; m[v.burger_nombre].revenue+=v.revenue; } return m; };
+  const thisWR = weekRank(thisWeekV);
+  const lastWR = weekRank(lastWeekV);
+  const thisWeekTotal = thisWeekV.reduce((s,v)=>s+v.revenue,0);
+  const lastWeekTotal = lastWeekV.reduce((s,v)=>s+v.revenue,0);
+  const allWeekNames = [...new Set([...Object.keys(thisWR),...Object.keys(lastWR)])];
+
+  // ventas por mes
+  const porMes = {};
+  for (const v of ventasC) {
+    const k = getMesKey(v.fecha); if (!k) continue;
+    if (!porMes[k]) porMes[k] = { revenue:0, unidades:0, costo:0 };
+    porMes[k].revenue += v.revenue; porMes[k].unidades += v.cantidad||0; porMes[k].costo += v.costo;
+  }
+  const mesesOrdenados = Object.entries(porMes).sort((a,b) => a[0].localeCompare(b[0]));
+
+  // P&L desde cajaDiaria
+  const cajaPorMes = {};
+  for (const m of movs) {
+    const k = getMesKey(m.fecha); if (!k) continue;
+    if (!cajaPorMes[k]) cajaPorMes[k] = { ingresos:0, egresos:0 };
+    cajaPorMes[k].ingresos += Number(m.ingreso)||0; cajaPorMes[k].egresos += Number(m.egreso)||0;
+  }
+  const totalCostosFijos = (costosFijos||[]).reduce((s,c) => s+(c.monto||0), 0);
+
+  // rentabilidad por burger
+  const ventasPorBurgerId = {};
+  for (const v of ventas) { ventasPorBurgerId[v.burger_id] = (ventasPorBurgerId[v.burger_id]||0) + (v.cantidad||0); }
+  const rentabilidad = (burgers||[]).map(b => {
+    const costo = calcCostoBurger(b, insumos, salsas);
+    const margen = (b.precio_venta||0) - costo;
+    const pct = b.precio_venta > 0 ? (margen/b.precio_venta)*100 : 0;
+    const udsVendidas = ventasPorBurgerId[b.id] || 0;
+    const margenReal = margen * udsVendidas;
+    return { ...b, costo, margen, pct, udsVendidas, margenReal };
+  }).sort((a,b) => b.pct - a.pct);
+
+  // costo de compras de insumos (ingresosStock)
+  const costoIngreso = (ingreso) => ingreso.items.reduce((s, item) => {
+    const ins = insumos.find(i => i.id === Number(item.insumoId));
+    return s + (ins ? ins.precio_unidad * item.cantidad : 0);
+  }, 0);
+
+  // filtro CMV por fecha
+  const cmvDesdeD = cmvDesde ? new Date(cmvDesde) : null;
+  const cmvHastaD = cmvHasta ? new Date(new Date(cmvHasta).setHours(23,59,59)) : null;
+  const ventasFilt = (cmvDesdeD||cmvHastaD) ? ventasC.filter(v => {
+    const d = parseDMY(v.fecha);
+    if (!d) return false;
+    if (cmvDesdeD && d < cmvDesdeD) return false;
+    if (cmvHastaD && d > cmvHastaD) return false;
+    return true;
+  }) : ventasC;
+  const ingresosFilt = (cmvDesdeD||cmvHastaD) ? ingresos.filter(i => {
+    const d = new Date(i.fecha); if (isNaN(d)) return false;
+    if (cmvDesdeD && d < cmvDesdeD) return false;
+    if (cmvHastaD && d > cmvHastaD) return false;
+    return true;
+  }) : ingresos;
+  const filtRevenue = ventasFilt.reduce((s,v) => s+v.revenue, 0);
+  const filtCMVteo = ventasFilt.reduce((s,v) => s+v.costo, 0);
+  const filtCompras = ingresosFilt.reduce((s,i) => s+costoIngreso(i), 0);
+  const filtMargen = filtRevenue - filtCMVteo;
+
+  const subTabs = [
+    { label:"Resumen", icon:"📊" },
+    { label:"Ranking Burgers", icon:"🏆" },
+    { label:"Rentabilidad", icon:"💰" },
+    { label:"CMV y Margen", icon:"💹" },
+    { label:"Ventas por Mes", icon:"📅" },
+    { label:"P&L Mensual", icon:"📈" },
+  ];
+
+  const emptyMsg = (txt) => (
+    <div style={{ textAlign:"center", padding:"40px", color:"#8aba9e", fontFamily:mono, fontSize:"11px" }}>{txt}</div>
+  );
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+
+      {/* sub-tabs */}
+      <div style={{ display:"flex", gap:"6px", flexWrap:"wrap" }}>
+        {subTabs.map((t,i) => (
+          <button key={i} onClick={() => setSubTab(i)} style={{ padding:"7px 14px", borderRadius:"20px", fontSize:"11px", cursor:"pointer", fontFamily:mono, background:subTab===i?"#1a7a3a":"#f0faf4", color:subTab===i?"#fff":"#5a8a6e", border:`1px solid ${subTab===i?"#1a7a3a":"#c8e6c9"}`, fontWeight:subTab===i?"700":"400" }}>
+            {t.icon} {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* ─── 0. RESUMEN ─── */}
+      {subTab === 0 && (
+        <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"9px" }}>
+            <StatBox label="Revenue total" value={fmt(totalRevenue)} accent sub={`${totalUnidades} unidades`} />
+            <StatBox label="CMV teórico total" value={fmt(totalCMVteo)} warn={totalCMVteo>0} sub="Costo de lo vendido" />
+            <StatBox label="Margen bruto" value={fmt(totalMargen)} accent={totalMargen>=0} warn={totalMargen<0} sub={totalRevenue>0?`${((totalMargen/totalRevenue)*100).toFixed(1)}% del revenue`:""} />
+            <StatBox label="Ticket promedio/día" value={fmt(diasConVentas>0?totalRevenue/diasConVentas:0)} accent sub={`${diasConVentas} días con ventas`} />
+          </div>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"9px" }}>
+            <StatBox label="Ingresos caja (total)" value={fmt(Object.values(cajaPorMes).reduce((s,v)=>s+v.ingresos,0))} accent />
+            <StatBox label="Egresos caja (total)" value={fmt(Object.values(cajaPorMes).reduce((s,v)=>s+v.egresos,0))} warn />
+            <StatBox label="Costos fijos/mes" value={fmt(totalCostosFijos)} warn={totalCostosFijos>0} />
+            <StatBox label="Meses con ventas" value={mesesOrdenados.length} sub={rankingBurgers[0]?`Top: ${rankingBurgers[0].nombre.split(" - ")[0]}`:"Sin ventas"} />
+          </div>
+          {ventas.length===0 && <Card>{emptyMsg("Sin datos de ventas. Registrá ventas en la solapa Ventas para ver los reportes.")}</Card>}
+        </div>
+      )}
+
+      {/* ─── 1. RANKING BURGERS ─── */}
+      {subTab === 1 && (
+        <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+        {/* Comparativa semanal */}
+        <Card>
+          <H title="Esta semana vs semana anterior" />
+          <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px", marginBottom:"14px" }}>
+            <StatBox label="Esta semana" value={fmt(thisWeekTotal)} accent={thisWeekTotal>0} sub={`${thisWeekV.reduce((s,v)=>s+(v.cantidad||0),0)} uds`} />
+            <StatBox label="Semana anterior" value={fmt(lastWeekTotal)} sub={`${lastWeekV.reduce((s,v)=>s+(v.cantidad||0),0)} uds`} />
+          </div>
+          {allWeekNames.length > 0 ? (
+            <table style={{ width:"100%", borderCollapse:"collapse", fontFamily:mono, fontSize:"12px" }}>
+              <thead><tr style={{ borderBottom:"2px solid #c8e6d0" }}>
+                {[{l:"Burger",a:"left"},{l:"Esta semana",a:"right"},{l:"Ant.",a:"right"},{l:"Δ uds",a:"right"}].map(c=>(
+                  <th key={c.l} style={{ padding:"7px 8px", color:"#5a8a6e", fontSize:"9px", letterSpacing:"0.08em", textTransform:"uppercase", fontWeight:"700", textAlign:c.a }}>{c.l}</th>
+                ))}
+              </tr></thead>
+              <tbody>
+                {allWeekNames.sort((a,b)=>((thisWR[b]?.unidades||0)+(lastWR[b]?.unidades||0))-((thisWR[a]?.unidades||0)+(lastWR[a]?.unidades||0))).map((nombre,i)=>{
+                  const tw=thisWR[nombre]?.unidades||0; const lw=lastWR[nombre]?.unidades||0; const delta=tw-lw;
+                  return (
+                    <tr key={nombre} style={{ borderBottom:"1px solid #e8f5ec", background:i%2===0?"#fafffe":"#fff" }}>
+                      <td style={{ padding:"8px", color:"#1a3a25", fontWeight:"600" }}>{nombre}</td>
+                      <td style={{ padding:"8px", textAlign:"right", color:"#1a7a3a", fontWeight:"700" }}>{tw}</td>
+                      <td style={{ padding:"8px", textAlign:"right", color:"#5a8a6e" }}>{lw}</td>
+                      <td style={{ padding:"8px", textAlign:"right", color:delta>0?"#1a7a3a":delta<0?"#cc4400":"#8aba9e", fontWeight:"700" }}>
+                        {delta>0?`▲ +${delta}`:delta<0?`▼ ${delta}`:"="}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          ) : <div style={{ color:"#8aba9e", fontFamily:mono, fontSize:"11px" }}>Sin datos para las últimas dos semanas.</div>}
+        </Card>
+        <Card>
+          <H title="Ranking — Burgers más vendidas" />
+          {rankingBurgers.length > 0 ? (
+            <>
+              <div style={{ display:"flex", flexDirection:"column", gap:"9px", marginBottom:"20px" }}>
+                {rankingBurgers.map((b,i) => {
+                  const pct = totalUnidades>0?(b.unidades/totalUnidades)*100:0;
+                  const maxU = rankingBurgers[0].unidades;
+                  const cols = ["#1a7a3a","#2e9d52","#52b973","#7acc8e","#9ad9ab","#b8e6c8"];
+                  return (
+                    <div key={b.nombre} style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+                      <span style={{ color:i<3?"#1a7a3a":"#8aba9e", fontFamily:mono, fontSize:"12px", width:"22px", textAlign:"right", fontWeight:i<3?"700":"400" }}>#{i+1}</span>
+                      <div style={{ flex:1, minWidth:0 }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", marginBottom:"4px", gap:"8px" }}>
+                          <span style={{ color:"#1a3a25", fontFamily:mono, fontSize:"11px", fontWeight:"600", overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{b.nombre}</span>
+                          <span style={{ flexShrink:0, fontFamily:mono, fontSize:"10px", color:"#5a8a6e" }}>
+                            <span style={{ color:"#1a7a3a", fontWeight:"700" }}>{b.unidades} ud</span>
+                            {" · "}<span style={{ color:"#1a3a25", fontWeight:"700" }}>{fmt(b.revenue)}</span>
+                            {" · "}{pct.toFixed(1)}%
+                          </span>
+                        </div>
+                        <div style={{ height:"7px", background:"#e8f5ec", borderRadius:"4px" }}>
+                          <div style={{ height:"100%", width:`${maxU>0?(b.unidades/maxU)*100:0}%`, background:cols[Math.min(i,5)], borderRadius:"4px" }} />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              {/* mix de revenue */}
+              <div style={{ color:"#5a8a6e", fontSize:"9px", fontFamily:mono, marginBottom:"6px", letterSpacing:"0.1em", textTransform:"uppercase" }}>Mix de revenue</div>
+              <div style={{ display:"flex", height:"18px", borderRadius:"4px", overflow:"hidden", gap:"1px", marginBottom:"8px" }}>
+                {rankingBurgers.slice(0,8).map((b,i) => {
+                  const pct = totalRevenue>0?(b.revenue/totalRevenue)*100:0;
+                  const cs=["#1a7a3a","#2e9d52","#52b973","#7acc8e","#9ad9ab","#b8e6c8","#cceedd","#ddf5e8"];
+                  return <div key={b.nombre} title={`${b.nombre}: ${pct.toFixed(1)}%`} style={{ width:`${pct}%`, background:cs[i], minWidth:"2px" }} />;
+                })}
+              </div>
+              <div style={{ display:"flex", flexWrap:"wrap", gap:"8px" }}>
+                {rankingBurgers.slice(0,8).map((b,i) => {
+                  const pct = totalRevenue>0?(b.revenue/totalRevenue)*100:0;
+                  const cs=["#1a7a3a","#2e9d52","#52b973","#7acc8e","#9ad9ab","#b8e6c8","#cceedd","#ddf5e8"];
+                  return <div key={b.nombre} style={{ display:"flex", alignItems:"center", gap:"4px" }}><div style={{ width:"8px",height:"8px",borderRadius:"2px",background:cs[i] }}/><span style={{ color:"#5a8a6e",fontFamily:mono,fontSize:"9px" }}>{b.nombre.split(" - ")[0]} {pct.toFixed(1)}%</span></div>;
+                })}
+              </div>
+            </>
+          ) : emptyMsg("Sin datos de ventas.")}
+        </Card>
+        </div>
+      )}
+
+      {/* ─── 2. RENTABILIDAD ─── */}
+      {subTab === 2 && (
+        <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(3,1fr)", gap:"9px" }}>
+            <StatBox label="Mayor margen" value={fmt(rentabilidad[0]?.margen||0)} accent sub={rentabilidad[0]?.nombre||""} />
+            <StatBox label="Margen % promedio" value={`${(rentabilidad.reduce((s,b)=>s+b.pct,0)/(rentabilidad.length||1)).toFixed(1)}%`} accent />
+            <StatBox label="Menor margen" value={fmt(rentabilidad[rentabilidad.length-1]?.margen||0)} warn sub={rentabilidad[rentabilidad.length-1]?.nombre||""} />
+          </div>
+          <Card>
+            <H title="Margen por burger (precio venta − costo ingredientes)" />
+            <div style={{ overflowX:"auto" }}>
+              <table style={{ width:"100%", borderCollapse:"collapse", fontFamily:mono, fontSize:"12px" }}>
+                <thead><tr style={{ borderBottom:"2px solid #c8e6d0" }}>
+                  {["Burger","Precio venta","Costo ingred.","Margen $","Margen %","Uds vend.","Margen real",""].map(h=>(
+                    <th key={h} style={{ padding:"8px 10px", color:"#5a8a6e", fontSize:"9px", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:"700", textAlign:h==="Burger"||h===""?"left":"right" }}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {rentabilidad.map((b,i)=>(
+                    <tr key={b.id} style={{ borderBottom:"1px solid #e8f5ec", background:i%2===0?"#fafffe":"#fff" }}>
+                      <td style={{ padding:"9px 10px", color:"#1a3a25", fontWeight:"600" }}>{b.nombre}</td>
+                      <td style={{ padding:"9px 10px", textAlign:"right" }}>{fmt(b.precio_venta)}</td>
+                      <td style={{ padding:"9px 10px", textAlign:"right", color:"#cc4400" }}>{fmt(b.costo)}</td>
+                      <td style={{ padding:"9px 10px", textAlign:"right", color:b.margen>=0?"#1a7a3a":"#cc4400", fontWeight:"700" }}>{fmt(b.margen)}</td>
+                      <td style={{ padding:"9px 10px", textAlign:"right" }}>
+                        <span style={{ background:b.pct>=60?"#e8f5e9":b.pct>=40?"#fff3e0":"#fce8e6", color:b.pct>=60?"#1a7a3a":b.pct>=40?"#e6a817":"#cc4400", padding:"2px 8px", borderRadius:"10px", fontWeight:"700", fontSize:"11px" }}>{b.pct.toFixed(1)}%</span>
+                      </td>
+                      <td style={{ padding:"9px 10px", textAlign:"right", color:"#1a3a25", fontWeight:"600" }}>{b.udsVendidas}</td>
+                      <td style={{ padding:"9px 10px", textAlign:"right", color:b.margenReal>=0?"#1a7a3a":"#cc4400", fontWeight:"700" }}>{b.udsVendidas>0?fmt(b.margenReal):"—"}</td>
+                      <td style={{ padding:"9px 6px", fontSize:"11px" }}>{b.pct>=65?"⭐⭐⭐":b.pct>=50?"⭐⭐":"⭐"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Card>
+        </div>
+      )}
+
+      {/* ─── 3. CMV Y MARGEN BRUTO ─── */}
+      {subTab === 3 && (
+        <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+          {/* Filtro */}
+          <Card>
+            <H title="Filtro de período" />
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr auto auto auto", gap:"8px", alignItems:"end" }}>
+              <div>
+                <div style={{ color:"#5a8a6e", fontSize:"9px", fontFamily:mono, marginBottom:"4px" }}>DESDE</div>
+                <input type="date" value={cmvDesde} onChange={e=>setCmvDesde(e.target.value)} style={{ ...IS, width:"100%" }} />
+              </div>
+              <div>
+                <div style={{ color:"#5a8a6e", fontSize:"9px", fontFamily:mono, marginBottom:"4px" }}>HASTA</div>
+                <input type="date" value={cmvHasta} onChange={e=>setCmvHasta(e.target.value)} style={{ ...IS, width:"100%" }} />
+              </div>
+              <Btn variant="secondary" style={{ fontSize:"10px" }} onClick={()=>{ const h=new Date(),d=new Date(); d.setDate(h.getDate()-(h.getDay()===0?6:h.getDay()-1)); setCmvDesde(d.toISOString().split("T")[0]); setCmvHasta(h.toISOString().split("T")[0]); }}>Esta semana</Btn>
+              <Btn variant="secondary" style={{ fontSize:"10px" }} onClick={()=>{ const h=new Date(),d=new Date(); d.setDate(1); setCmvDesde(d.toISOString().split("T")[0]); setCmvHasta(h.toISOString().split("T")[0]); }}>Este mes</Btn>
+              {(cmvDesde||cmvHasta)&&<Btn variant="secondary" style={{ fontSize:"10px" }} onClick={()=>{ setCmvDesde(""); setCmvHasta(""); }}>✕ Todo</Btn>}
+            </div>
+          </Card>
+
+          {/* KPIs principales */}
+          <div style={{ display:"grid", gridTemplateColumns:"repeat(4,1fr)", gap:"9px" }}>
+            <StatBox label="Ventas del período" value={fmt(filtRevenue)} accent sub={`${ventasFilt.reduce((s,v)=>s+(v.cantidad||0),0)} unidades`} />
+            <StatBox label="Compras de mercadería" value={fmt(filtCompras)} warn={filtCompras>0} sub={`${ingresosFilt.length} ingresos de stock`} />
+            <StatBox
+              label="CMV % (compras / ventas)"
+              value={filtRevenue>0?`${((filtCompras/filtRevenue)*100).toFixed(1)}%`:"—"}
+              warn={filtRevenue>0&&filtCompras/filtRevenue>0.4}
+              accent={filtRevenue>0&&filtCompras/filtRevenue<=0.4}
+              sub={filtRevenue>0?(filtCompras/filtRevenue<=0.4?"Bajo — bien":"Alto — revisar"):"Sin ventas"}
+            />
+            <StatBox label="Lo que quedó (ventas − compras)" value={fmt(filtRevenue-filtCompras)} accent={filtRevenue>=filtCompras} warn={filtRevenue<filtCompras} />
+          </div>
+
+          {/* Barra visual compras vs ventas */}
+          {filtRevenue>0 && (
+            <Card>
+              <div style={{ color:"#5a8a6e", fontSize:"9px", fontFamily:mono, marginBottom:"8px", letterSpacing:"0.1em", textTransform:"uppercase" }}>Compras vs ventas del período</div>
+              <div style={{ display:"flex", height:"28px", borderRadius:"6px", overflow:"hidden", marginBottom:"6px" }}>
+                <div style={{ width:`${Math.min((filtCompras/filtRevenue)*100,100)}%`, background:"#cc4400", minWidth:"3px" }} title={`Compras: ${fmt(filtCompras)}`} />
+                <div style={{ flex:1, background:"#1a7a3a" }} title={`Restante: ${fmt(filtRevenue-filtCompras)}`} />
+              </div>
+              <div style={{ display:"flex", gap:"16px" }}>
+                <div style={{ display:"flex", alignItems:"center", gap:"5px" }}><div style={{ width:"10px",height:"10px",borderRadius:"2px",background:"#cc4400" }}/><span style={{ color:"#5a8a6e",fontFamily:mono,fontSize:"9px" }}>Compras {((filtCompras/filtRevenue)*100).toFixed(1)}%</span></div>
+                <div style={{ display:"flex", alignItems:"center", gap:"5px" }}><div style={{ width:"10px",height:"10px",borderRadius:"2px",background:"#1a7a3a" }}/><span style={{ color:"#5a8a6e",fontFamily:mono,fontSize:"9px" }}>Resto {(100-(filtCompras/filtRevenue)*100).toFixed(1)}%</span></div>
+              </div>
+            </Card>
+          )}
+
+          {/* Detalle ventas del período */}
+          {ventasFilt.length>0 && (
+            <Card>
+              <H title="Ventas del período" />
+              {(()=>{
+                const pb={};
+                for(const v of ventasFilt){ if(!pb[v.burger_nombre])pb[v.burger_nombre]={nombre:v.burger_nombre,unidades:0,revenue:0}; pb[v.burger_nombre].unidades+=v.cantidad||0; pb[v.burger_nombre].revenue+=v.revenue; }
+                const filas=Object.values(pb).sort((a,b)=>b.revenue-a.revenue);
+                return (
+                  <table style={{ width:"100%", borderCollapse:"collapse", fontFamily:mono, fontSize:"12px" }}>
+                    <thead><tr style={{ borderBottom:"2px solid #c8e6d0" }}>
+                      {["Producto","Uds","Revenue","% del total"].map(h=>(
+                        <th key={h} style={{ padding:"8px 10px", color:"#5a8a6e", fontSize:"9px", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:"700", textAlign:h==="Producto"?"left":"right" }}>{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {filas.map((r,i)=>{ const pct=filtRevenue>0?(r.revenue/filtRevenue)*100:0; return (
+                        <tr key={r.nombre} style={{ borderBottom:"1px solid #e8f5ec", background:i%2===0?"#fafffe":"#fff" }}>
+                          <td style={{ padding:"9px 10px", color:"#1a3a25", fontWeight:"600" }}>{r.nombre}</td>
+                          <td style={{ padding:"9px 10px", textAlign:"right" }}>{r.unidades}</td>
+                          <td style={{ padding:"9px 10px", textAlign:"right", color:"#1a7a3a", fontWeight:"700" }}>{fmt(r.revenue)}</td>
+                          <td style={{ padding:"9px 10px", textAlign:"right", color:"#5a8a6e" }}>{pct.toFixed(1)}%</td>
+                        </tr>
+                      );} )}
+                    </tbody>
+                    <tfoot><tr style={{ borderTop:"2px solid #c8e6d0" }}>
+                      <td colSpan={2} style={{ padding:"10px", color:"#5a8a6e", fontFamily:mono, fontSize:"11px", fontWeight:"700" }}>TOTAL</td>
+                      <td style={{ padding:"10px", textAlign:"right", color:"#1a7a3a", fontWeight:"700", fontSize:"13px" }}>{fmt(filtRevenue)}</td>
+                      <td />
+                    </tr></tfoot>
+                  </table>
+                );
+              })()}
+            </Card>
+          )}
+
+          {/* Detalle compras del período */}
+          {ingresosFilt.length>0 ? (
+            <Card>
+              <H title="Compras de mercadería en el período" />
+              <table style={{ width:"100%", borderCollapse:"collapse", fontFamily:mono, fontSize:"12px" }}>
+                <thead><tr style={{ borderBottom:"2px solid #c8e6d0" }}>
+                  {["Fecha","Nota","Items","Costo total"].map(h=>(
+                    <th key={h} style={{ padding:"8px 10px", color:"#5a8a6e", fontSize:"9px", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:"700", textAlign:h==="Costo total"?"right":"left" }}>{h}</th>
+                  ))}
+                </tr></thead>
+                <tbody>
+                  {ingresosFilt.map((ing,i)=>{ const costo=costoIngreso(ing); return (
+                    <tr key={ing.id} style={{ borderBottom:"1px solid #e8f5ec", background:i%2===0?"#fafffe":"#fff" }}>
+                      <td style={{ padding:"9px 10px", color:"#5a8a6e", fontSize:"10px", whiteSpace:"nowrap" }}>{ing.fecha}</td>
+                      <td style={{ padding:"9px 10px", color:"#1a3a25" }}>{ing.nota||"—"}</td>
+                      <td style={{ padding:"9px 10px", color:"#5a8a6e" }}>{ing.items.length} insumos</td>
+                      <td style={{ padding:"9px 10px", textAlign:"right", color:"#cc4400", fontWeight:"700" }}>{fmt(costo)}</td>
+                    </tr>
+                  );} )}
+                </tbody>
+                <tfoot><tr style={{ borderTop:"2px solid #c8e6d0" }}>
+                  <td colSpan={3} style={{ padding:"10px", color:"#5a8a6e", fontFamily:mono, fontSize:"11px", fontWeight:"700" }}>TOTAL COMPRAS</td>
+                  <td style={{ padding:"10px", textAlign:"right", color:"#cc4400", fontWeight:"700", fontSize:"13px" }}>{fmt(filtCompras)}</td>
+                </tr></tfoot>
+              </table>
+            </Card>
+          ) : (
+            <Card style={{ border:"1px solid #e8d8c0", background:"#fffbf5" }}>
+              <div style={{ color:"#8a7a5e", fontFamily:mono, fontSize:"11px", textAlign:"center", padding:"20px" }}>
+                Sin ingresos de mercadería en el período. Cargalos en la solapa <strong>Stock</strong>.
+              </div>
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* ─── 4. VENTAS POR MES ─── */}
+      {subTab === 4 && (
+        <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+          {mesesOrdenados.length>0 ? (
+            <>
+              <Card>
+                <H title="Comparativo mensual de revenue" />
+                <div style={{ display:"flex", alignItems:"flex-end", gap:"6px", height:"130px", padding:"0 4px", marginBottom:"8px" }}>
+                  {mesesOrdenados.map(([k,v])=>{ const maxR=Math.max(...mesesOrdenados.map(([,x])=>x.revenue),1); const h=(v.revenue/maxR)*100; return (
+                    <div key={k} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:"3px" }}>
+                      <span style={{ color:"#5a8a6e", fontFamily:mono, fontSize:"7px", textAlign:"center", lineHeight:1.2 }}>{fmt(v.revenue).replace(/\$\s*/,"")}</span>
+                      <div style={{ width:"100%", height:`${h}%`, background:"#1a7a3a", borderRadius:"3px 3px 0 0", minHeight:"4px" }} />
+                      <span style={{ color:"#5a8a6e", fontFamily:mono, fontSize:"7px", textAlign:"center" }}>{getMesLabel(k)}</span>
+                    </div>
+                  );})}
+                </div>
+              </Card>
+              <Card>
+                <H title="Tabla mensual" />
+                <table style={{ width:"100%", borderCollapse:"collapse", fontFamily:mono, fontSize:"12px" }}>
+                  <thead><tr style={{ borderBottom:"2px solid #c8e6d0" }}>
+                    {["Mes","Revenue","CMV","Margen $","Margen %","Unidades","Ticket/día"].map(h=>(
+                      <th key={h} style={{ padding:"8px 10px", color:"#5a8a6e", fontSize:"9px", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:"700", textAlign:h==="Mes"?"left":"right" }}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {mesesOrdenados.map(([k,v],i)=>{ const mg=v.revenue-v.costo; const pct=v.revenue>0?(mg/v.revenue)*100:0; const dias=new Set(ventas.filter(vv=>getMesKey(vv.fecha)===k).map(vv=>vv.fecha)).size; return (
+                      <tr key={k} style={{ borderBottom:"1px solid #e8f5ec", background:i%2===0?"#fafffe":"#fff" }}>
+                        <td style={{ padding:"9px 10px", color:"#1a3a25", fontWeight:"600" }}>{getMesLabel(k)}</td>
+                        <td style={{ padding:"9px 10px", textAlign:"right", color:"#1a7a3a", fontWeight:"700" }}>{fmt(v.revenue)}</td>
+                        <td style={{ padding:"9px 10px", textAlign:"right", color:"#cc4400" }}>{fmt(v.costo)}</td>
+                        <td style={{ padding:"9px 10px", textAlign:"right", color:mg>=0?"#1a7a3a":"#cc4400", fontWeight:"700" }}>{fmt(mg)}</td>
+                        <td style={{ padding:"9px 10px", textAlign:"right" }}><span style={{ color:pct>=50?"#1a7a3a":"#e6a817", fontWeight:"700" }}>{pct.toFixed(1)}%</span></td>
+                        <td style={{ padding:"9px 10px", textAlign:"right" }}>{v.unidades}</td>
+                        <td style={{ padding:"9px 10px", textAlign:"right", color:"#5a8a6e" }}>{fmt(dias>0?v.revenue/dias:0)}</td>
+                      </tr>
+                    );} )}
+                  </tbody>
+                  <tfoot><tr style={{ borderTop:"2px solid #c8e6d0" }}>
+                    <td style={{ padding:"10px", color:"#5a8a6e", fontFamily:mono, fontSize:"11px", fontWeight:"700" }}>TOTAL</td>
+                    <td style={{ padding:"10px", textAlign:"right", color:"#1a7a3a", fontWeight:"700", fontSize:"13px" }}>{fmt(totalRevenue)}</td>
+                    <td style={{ padding:"10px", textAlign:"right", color:"#cc4400", fontWeight:"700", fontSize:"13px" }}>{fmt(totalCMVteo)}</td>
+                    <td style={{ padding:"10px", textAlign:"right", color:totalMargen>=0?"#1a7a3a":"#cc4400", fontWeight:"700", fontSize:"13px" }}>{fmt(totalMargen)}</td>
+                    <td style={{ padding:"10px", textAlign:"right", color:"#1a7a3a", fontWeight:"700" }}>{totalRevenue>0?`${((totalMargen/totalRevenue)*100).toFixed(1)}%`:"—"}</td>
+                    <td style={{ padding:"10px", textAlign:"right", fontWeight:"700" }}>{totalUnidades}</td>
+                    <td />
+                  </tr></tfoot>
+                </table>
+              </Card>
+
+              {/* Envíos por mes */}
+              {(()=>{
+                const enviosPorMes = {};
+                for (const v of ventas) {
+                  if (!v.burger_nombre?.startsWith("Envío")) continue;
+                  const k = getMesKey(v.fecha); if (!k) continue;
+                  if (!enviosPorMes[k]) enviosPorMes[k] = 0;
+                  enviosPorMes[k] += v.cantidad || 0;
+                }
+                const filas = Object.entries(enviosPorMes).sort((a,b) => a[0].localeCompare(b[0]));
+                const totalEnvios = filas.reduce((s,[,n]) => s+n, 0);
+                if (filas.length === 0) return null;
+                const maxEnv = Math.max(...filas.map(([,n]) => n), 1);
+                return (
+                  <Card>
+                    <H title="🛵 Envíos por mes" />
+                    <div style={{ display:"flex", alignItems:"flex-end", gap:"8px", height:"80px", marginBottom:"14px" }}>
+                      {filas.map(([k,n]) => { const h=(n/maxEnv)*100; return (
+                        <div key={k} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:"3px" }}>
+                          <span style={{ color:"#1565c0", fontFamily:mono, fontSize:"9px", fontWeight:"700" }}>{n}</span>
+                          <div style={{ width:"100%", height:`${h}%`, background:"#1565c0", borderRadius:"3px 3px 0 0", minHeight:"4px" }} />
+                          <span style={{ color:"#5a8a6e", fontFamily:mono, fontSize:"7px", textAlign:"center" }}>{getMesLabel(k)}</span>
+                        </div>
+                      );})}
+                    </div>
+                    <table style={{ width:"100%", borderCollapse:"collapse", fontFamily:mono, fontSize:"12px" }}>
+                      <thead><tr style={{ borderBottom:"2px solid #c8e6d0" }}>
+                        {["Mes","Envíos"].map(h => (
+                          <th key={h} style={{ padding:"8px 10px", color:"#5a8a6e", fontSize:"9px", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:"700", textAlign:h==="Mes"?"left":"right" }}>{h}</th>
+                        ))}
+                      </tr></thead>
+                      <tbody>
+                        {filas.map(([k,n],i) => (
+                          <tr key={k} style={{ borderBottom:"1px solid #e8f5ec", background:i%2===0?"#fafffe":"#fff" }}>
+                            <td style={{ padding:"9px 10px", color:"#1a3a25", fontWeight:"600" }}>{getMesLabel(k)}</td>
+                            <td style={{ padding:"9px 10px", textAlign:"right", color:"#1565c0", fontWeight:"700", fontSize:"13px" }}>{n}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                      <tfoot><tr style={{ borderTop:"2px solid #c8e6d0" }}>
+                        <td style={{ padding:"10px", color:"#5a8a6e", fontFamily:mono, fontSize:"11px", fontWeight:"700" }}>TOTAL</td>
+                        <td style={{ padding:"10px", textAlign:"right", color:"#1565c0", fontWeight:"700", fontSize:"14px" }}>{totalEnvios}</td>
+                      </tr></tfoot>
+                    </table>
+                  </Card>
+                );
+              })()}
+            </>
+          ) : <Card>{emptyMsg("Sin ventas registradas.")}</Card>}
+        </div>
+      )}
+
+      {/* ─── 5. P&L MENSUAL ─── */}
+      {subTab === 5 && (
+        <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+          <Card style={{ border:"1px solid #c8d8e8", background:"#f8fbfd" }}>
+            <div style={{ color:"#5a8a6e", fontFamily:mono, fontSize:"10px", lineHeight:1.8 }}>
+              <strong>¿Cómo se calcula?</strong> Ingresos y egresos de Caja Diaria agrupados por mes, descontando los costos fijos mensuales ({fmt(totalCostosFijos)}/mes). Muestra cuánta plata debería haber quedado cada mes.
+            </div>
+          </Card>
+          {Object.keys(cajaPorMes).length>0 ? (
+            <>
+              {/* bar chart resultado neto */}
+              <Card>
+                <H title="Resultado neto mensual" />
+                {(()=>{
+                  const mesesPL=Object.entries(cajaPorMes).sort((a,b)=>a[0].localeCompare(b[0]));
+                  const netos=mesesPL.map(([,v])=>v.ingresos-v.egresos-totalCostosFijos);
+                  const maxA=Math.max(...netos.map(Math.abs),1);
+                  return (
+                    <div style={{ display:"flex", alignItems:"center", gap:"6px", height:"90px", marginBottom:"8px" }}>
+                      {mesesPL.map(([k],i)=>{ const n=netos[i]; const h=(Math.abs(n)/maxA)*90; return (
+                        <div key={k} style={{ flex:1, display:"flex", flexDirection:"column", alignItems:"center", gap:"3px", height:"100%" }}>
+                          <div style={{ flex:1, display:"flex", flexDirection:"column", justifyContent:"flex-end", width:"100%" }}>
+                            <div style={{ width:"100%", height:`${h}%`, background:n>=0?"#1a7a3a":"#cc4400", borderRadius:"3px 3px 0 0", minHeight:"3px" }} />
+                          </div>
+                          <span style={{ color:"#5a8a6e", fontFamily:mono, fontSize:"7px" }}>{getMesLabel(k)}</span>
+                        </div>
+                      );})}
+                    </div>
+                  );
+                })()}
+              </Card>
+              <Card>
+                <H title="Detalle P&L por mes" />
+                <table style={{ width:"100%", borderCollapse:"collapse", fontFamily:mono, fontSize:"12px" }}>
+                  <thead><tr style={{ borderBottom:"2px solid #c8e6d0" }}>
+                    {["Mes","Ingresos caja","Egresos caja","Resultado caja","Costos fijos","Resultado neto"].map(h=>(
+                      <th key={h} style={{ padding:"8px 10px", color:"#5a8a6e", fontSize:"9px", letterSpacing:"0.1em", textTransform:"uppercase", fontWeight:"700", textAlign:h==="Mes"?"left":"right" }}>{h}</th>
+                    ))}
+                  </tr></thead>
+                  <tbody>
+                    {Object.entries(cajaPorMes).sort((a,b)=>a[0].localeCompare(b[0])).map(([k,v],i)=>{ const rc=v.ingresos-v.egresos; const neto=rc-totalCostosFijos; return (
+                      <tr key={k} style={{ borderBottom:"1px solid #e8f5ec", background:i%2===0?"#fafffe":"#fff" }}>
+                        <td style={{ padding:"9px 10px", color:"#1a3a25", fontWeight:"600" }}>{getMesLabel(k)}</td>
+                        <td style={{ padding:"9px 10px", textAlign:"right", color:"#1a7a3a", fontWeight:"700" }}>{fmt(v.ingresos)}</td>
+                        <td style={{ padding:"9px 10px", textAlign:"right", color:"#cc4400" }}>{fmt(v.egresos)}</td>
+                        <td style={{ padding:"9px 10px", textAlign:"right", color:rc>=0?"#1a5c2a":"#cc4400", fontWeight:"700" }}>{fmt(rc)}</td>
+                        <td style={{ padding:"9px 10px", textAlign:"right", color:"#cc4400" }}>({fmt(totalCostosFijos)})</td>
+                        <td style={{ padding:"9px 10px", textAlign:"right" }}>
+                          <span style={{ background:neto>=0?"#e8f5e9":"#fce8e6", color:neto>=0?"#1a7a3a":"#cc4400", padding:"3px 10px", borderRadius:"10px", fontWeight:"700", fontSize:"12px" }}>{fmt(neto)}</span>
+                        </td>
+                      </tr>
+                    );} )}
+                  </tbody>
+                </table>
+              </Card>
+            </>
+          ) : <Card>{emptyMsg("Sin movimientos en Caja Diaria. Cargá ingresos y egresos para ver el P&L mensual.")}</Card>}
+        </div>
+      )}
+
+    </div>
+  );
+}
+
+// ===================== DASHBOARD =====================
+function DashboardTab({ cajaDiaria, ventasReg, burgers }) {
+  const mono = "'DM Mono', monospace";
+  const todayD = new Date();
+  const fmtISO = (d) => d.toISOString().split("T")[0];
+  const fmtDMY = (iso) => { try { const [y,m,d]=iso.split("-"); return `${d}/${m}/${y}`; } catch { return iso; } };
+  const todayStr = fmtDMY(fmtISO(todayD));
+  const ayer = new Date(todayD); ayer.setDate(todayD.getDate()-1);
+  const ayerStr = fmtDMY(fmtISO(ayer));
+
+  const movs = cajaDiaria || [];
+  const ventas = ventasReg || [];
+
+  let saldoEf = 0, saldoBanco = 0;
+  for (const m of movs) {
+    const t = m.tipo||"efectivo";
+    if (t==="efectivo") saldoEf += (Number(m.ingreso)||0)-(Number(m.egreso)||0);
+    else saldoBanco += (Number(m.ingreso)||0)-(Number(m.egreso)||0);
+  }
+
+  const ventasHoy = ventas.filter(v => v.fecha === todayStr);
+  const totalHoy = ventasHoy.reduce((s,v)=>s+(v.precio_unit||0)*(v.cantidad||0),0);
+  const udsHoy = ventasHoy.reduce((s,v)=>s+(v.cantidad||0),0);
+  const ventasAyer = ventas.filter(v => v.fecha === ayerStr);
+  const totalAyer = ventasAyer.reduce((s,v)=>s+(v.precio_unit||0)*(v.cantidad||0),0);
+  const udsAyer = ventasAyer.reduce((s,v)=>s+(v.cantidad||0),0);
+  const delta = totalHoy - totalAyer;
+  const deltaUds = udsHoy - udsAyer;
+  const movsHoy = movs.filter(m => m.fecha === todayStr);
+
+  return (
+    <div style={{ display:"flex", flexDirection:"column", gap:"14px" }}>
+      <div style={{ padding:"4px 0 2px" }}>
+        <div style={{ color:"#1a3a25", fontFamily:mono, fontWeight:"700", fontSize:"16px" }}>
+          {todayD.toLocaleDateString("es-AR",{weekday:"long",day:"numeric",month:"long"})}
+        </div>
+        <div style={{ color:"#8aba9e", fontFamily:mono, fontSize:"10px", marginTop:"3px" }}>Resumen del día</div>
+      </div>
+
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"10px" }}>
+        <StatBox label="💵 Saldo efectivo" value={fmt(saldoEf)} accent={saldoEf>=0} warn={saldoEf<0} />
+        <StatBox label="🏦 Saldo banco" value={fmt(saldoBanco)} accent={saldoBanco>=0} warn={saldoBanco<0} />
+      </div>
+
+      <Card>
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
+          <div>
+            <div style={{ color:"#5a8a6e", fontFamily:mono, fontSize:"9px", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"6px" }}>Ventas hoy</div>
+            <div style={{ color:"#1a7a3a", fontFamily:mono, fontWeight:"700", fontSize:"24px" }}>{fmt(totalHoy)}</div>
+            <div style={{ color:"#8aba9e", fontFamily:mono, fontSize:"10px", marginTop:"3px" }}>{udsHoy} unidades</div>
+          </div>
+          <div style={{ textAlign:"right" }}>
+            <div style={{ color:"#5a8a6e", fontFamily:mono, fontSize:"9px", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"6px" }}>vs ayer</div>
+            {(totalAyer>0||totalHoy>0) ? (
+              <>
+                <div style={{ color:delta>=0?"#1a7a3a":"#cc4400", fontFamily:mono, fontWeight:"700", fontSize:"15px" }}>
+                  {delta>=0?"▲":"▼"} {fmt(Math.abs(delta))}
+                </div>
+                <div style={{ color:"#8aba9e", fontFamily:mono, fontSize:"10px" }}>{deltaUds>=0?"+":""}{deltaUds} uds</div>
+                <div style={{ color:"#bbb", fontFamily:mono, fontSize:"9px", marginTop:"2px" }}>Ayer: {fmt(totalAyer)}</div>
+              </>
+            ) : <div style={{ color:"#8aba9e", fontFamily:mono, fontSize:"11px" }}>Sin datos</div>}
+          </div>
+        </div>
+        {ventasHoy.length>0 ? (
+          <div style={{ marginTop:"14px", borderTop:"1px solid #e8f5ec", paddingTop:"12px" }}>
+            {ventasHoy.map((v,i)=>(
+              <div key={v.id||i} style={{ display:"flex", justifyContent:"space-between", fontFamily:mono, fontSize:"12px", padding:"4px 0" }}>
+                <span style={{ color:"#1a3a25" }}>{v.cantidad}× {v.burger_nombre}</span>
+                <span style={{ color:"#5a8a6e" }}>{fmt((v.precio_unit||0)*(v.cantidad||0))}</span>
+              </div>
+            ))}
+          </div>
+        ) : <div style={{ marginTop:"10px", color:"#8aba9e", fontFamily:mono, fontSize:"11px" }}>Sin ventas registradas hoy.</div>}
+      </Card>
+
+      {movsHoy.length>0 && (
+        <Card>
+          <div style={{ color:"#5a8a6e", fontFamily:mono, fontSize:"9px", letterSpacing:"0.1em", textTransform:"uppercase", marginBottom:"10px" }}>Caja de hoy</div>
+          {movsHoy.map((m,i)=>(
+            <div key={m.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 0", borderBottom:i<movsHoy.length-1?"1px solid #e8f5ec":"none" }}>
+              <div>
+                <div style={{ color:"#1a3a25", fontFamily:mono, fontSize:"12px" }}>{m.concepto}</div>
+                <div style={{ color:"#8aba9e", fontFamily:mono, fontSize:"9px" }}>{m.tipo==="banco"?"🏦 Banco":"💵 Efectivo"}{m.categoria?` · ${m.categoria}`:""}</div>
+              </div>
+              <div style={{ textAlign:"right" }}>
+                {m.ingreso>0 && <div style={{ color:"#1a7a3a", fontFamily:mono, fontSize:"12px", fontWeight:"700" }}>+{fmt(m.ingreso)}</div>}
+                {m.egreso>0 && <div style={{ color:"#cc4400", fontFamily:mono, fontSize:"12px", fontWeight:"700" }}>-{fmt(m.egreso)}</div>}
+              </div>
+            </div>
+          ))}
+        </Card>
+      )}
+    </div>
+  );
+}
+
 export default function App() {
   const [tab, setTab] = useState(0);
   const [fbOk, setFbOk] = useState(null);
@@ -1833,12 +2802,29 @@ export default function App() {
   const [ventasReg, setVentasReg, r12] = usePersisted(KEYS.ventasReg, []);
   const [usuarios, setUsuarios, r14] = usePersisted(KEYS.usuarios, []);
   const [ingresosStock, setIngresosStock, r15] = usePersisted(KEYS.ingresosStock, []);
+  const [produccion, setProduccion, r16] = usePersisted(KEYS.produccion, []);
+
+  useEffect(() => {
+    if (!r2 || !burgers) return;
+    const hasF = burgers.find(b => b.nombre === "Envío Fisherton");
+    const hasFu = burgers.find(b => b.nombre === "Envío Funes");
+    const hasOld = burgers.find(b => b.nombre === "Envío");
+    if (!hasF || !hasFu || hasOld) {
+      setBurgers(prev => {
+        const filtered = (prev || []).filter(b => b.nombre !== "Envío");
+        const toAdd = [];
+        if (!filtered.find(b => b.nombre === "Envío Fisherton")) toAdd.push({ id: 99997, nombre: "Envío Fisherton", precio_venta: 2500, ingredientes: [] });
+        if (!filtered.find(b => b.nombre === "Envío Funes")) toAdd.push({ id: 99998, nombre: "Envío Funes", precio_venta: 3000, ingredientes: [] });
+        return [...filtered, ...toAdd];
+      });
+    }
+  }, [r2]);
 
   const logout = () => { localStorage.removeItem(SESSION_KEY); setCurrentUser(null); };
   if (!currentUser) return <LoginScreen onLogin={u => setCurrentUser(u)} />;
   const mesKey = `${new Date().getFullYear()}-${new Date().getMonth()}`;
 
-  if (![r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,r15,rp0,rp1].every(Boolean)) return (
+  if (![r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,r15,r16,rp0,rp1].every(Boolean)) return (
     <div style={{ minHeight: "100vh", background: "#f0f7f2", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "12px" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;700&display=swap');`}</style>
       <div style={{ fontSize: "28px" }}>🍔</div>
@@ -1847,8 +2833,10 @@ export default function App() {
   );
 
   const tabs = [
+    { label: "Dashboard", icon: "🏠" },
     { label: "Insumos", icon: "🛒" },
-    { label: "Salsas", icon: "🧪" },
+    { label: "Recetas", icon: "🧪" },
+    { label: "Producción", icon: "🥘" },
     { label: "Hamburguesas", icon: "🍔" },
     { label: "Equilibrio", icon: "⚖️" },
     { label: "Costos fijos", icon: "📋" },
@@ -1857,8 +2845,8 @@ export default function App() {
     { label: "Stock", icon: "📦" },
     { label: "Caja Diaria", icon: "💵" },
     { label: "Caja", icon: "📊" },
+    { label: "Reportes", icon: "📈" },
     ...(currentUser?.isAdmin ? [{ label: "Usuarios", icon: "👥" }] : []),
-    { label: "Pedidos Online", icon: "🛵" },
   ];
 
   const SB_BG   = "#0d1f14";
@@ -1945,18 +2933,20 @@ export default function App() {
           </span>
         </div>
         <div style={{ padding: "20px 24px" }}>
-          {tab === 0 && <InsumosTab insumos={insumos} setInsumos={setInsumos} />}
-          {tab === 1 && <SalsasTab salsas={salsas} setSalsas={setSalsas} insumos={insumos} />}
-          {tab === 2 && <BurgersTab burgers={burgers} setBurgers={setBurgers} insumos={insumos} salsas={salsas} />}
-          {tab === 3 && <PuntoEquilibrioTab burgers={burgers} costosFijos={costosFijos} insumos={insumos} salsas={salsas} ventas={ventasReg} />}
-          {tab === 4 && <CostosFijosTab costosFijos={costosFijos} setCostosFijos={setCostosFijos} pagos={pagos} setPagos={setPagos} mesKey={mesKey} />}
-          {tab === 5 && <ProveedoresTab proveedores={proveedores || []} setProveedores={setProveedores} pagosP={pagosP} setPagosP={setPagosP} mesKey={mesKey} />}
-          {tab === 6 && <VentasTab ventas={ventasReg} setVentas={setVentasReg} burgers={burgers} insumos={insumos} salsas={salsas} />}
-          {tab === 7 && <StockTab insumos={insumos} ventas={ventasReg} burgers={burgers} salsas={salsas} stockInicial={stockInicial} setStockInicial={setStockInicial} ingresosStock={ingresosStock || []} setIngresosStock={setIngresosStock} />}
-          {tab === 8 && <CajaDiariaTab cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} presets={cajaPresets || []} setPresets={setCajaPresets} />}
-          {tab === 9 && <CajaBancoTab costosFijos={costosFijos} pagos={pagos} proveedores={proveedores || []} pagosP={pagosP} mesKey={mesKey} cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} banco={banco} setBanco={setBanco} pedidosPendientes={pedidos} setPedidosPendientes={setPedidos} ventasDiarias={ventasDiarias} setVentasDiarias={setVentasDiarias} registros={registros || []} setRegistros={setRegistros} />}
-          {tab === 10 && currentUser?.isAdmin && <UsuariosTab usuarios={usuarios} setUsuarios={setUsuarios} />}
-          {tab === (currentUser?.isAdmin ? 11 : 10) && <PedidosOnlineTab />}
+          {tab === 0 && <DashboardTab cajaDiaria={cajaDiaria||[]} ventasReg={ventasReg} burgers={burgers} />}
+          {tab === 1 && <InsumosTab insumos={insumos} setInsumos={setInsumos} />}
+          {tab === 2 && <SalsasTab salsas={salsas} setSalsas={setSalsas} insumos={insumos} />}
+          {tab === 3 && <ProduccionTab salsas={salsas} insumos={insumos} produccion={produccion || []} setProduccion={setProduccion} ventas={ventasReg} burgers={burgers} />}
+          {tab === 4 && <BurgersTab burgers={burgers} setBurgers={setBurgers} insumos={insumos} salsas={salsas} />}
+          {tab === 5 && <PuntoEquilibrioTab burgers={burgers} costosFijos={costosFijos} insumos={insumos} salsas={salsas} ventas={ventasReg} />}
+          {tab === 6 && <CostosFijosTab costosFijos={costosFijos} setCostosFijos={setCostosFijos} pagos={pagos} setPagos={setPagos} mesKey={mesKey} />}
+          {tab === 7 && <ProveedoresTab proveedores={proveedores || []} setProveedores={setProveedores} pagosP={pagosP} setPagosP={setPagosP} mesKey={mesKey} />}
+          {tab === 8 && <VentasTab ventas={ventasReg} setVentas={setVentasReg} burgers={burgers} insumos={insumos} salsas={salsas} />}
+          {tab === 9 && <StockTab insumos={insumos} ventas={ventasReg} burgers={burgers} salsas={salsas} stockInicial={stockInicial} setStockInicial={setStockInicial} ingresosStock={ingresosStock || []} setIngresosStock={setIngresosStock} produccion={produccion || []} />}
+          {tab === 10 && <CajaDiariaTab cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} presets={cajaPresets || []} setPresets={setCajaPresets} />}
+          {tab === 11 && <CajaBancoTab costosFijos={costosFijos} pagos={pagos} proveedores={proveedores || []} pagosP={pagosP} mesKey={mesKey} cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} banco={banco} setBanco={setBanco} pedidosPendientes={pedidos} setPedidosPendientes={setPedidos} ventasDiarias={ventasDiarias} setVentasDiarias={setVentasDiarias} registros={registros || []} setRegistros={setRegistros} />}
+          {tab === 12 && <ReportesTab ventasReg={ventasReg} cajaDiaria={cajaDiaria||[]} costosFijos={costosFijos} burgers={burgers} insumos={insumos} salsas={salsas} ingresosStock={ingresosStock||[]} />}
+          {tab === 13 && currentUser?.isAdmin && <UsuariosTab usuarios={usuarios} setUsuarios={setUsuarios} />}
         </div>
       </div>
     </div>
