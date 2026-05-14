@@ -1247,8 +1247,180 @@ function ProveedoresTab({ proveedores, setProveedores, pagosP, setPagosP, mesKey
     </div>
   );
 }
+// ===================== EXTRAS =====================
+const CATS_EXTRA = ["Bebidas", "Guarniciones", "Postres", "Otros"];
+
+function ExtrasTab({ extras, setExtras, ventasExtras, setVentasExtras }) {
+  const mono = "'DM Mono', monospace";
+  const todayISO = new Date().toISOString().split("T")[0];
+  const fmtFecha = (iso) => { try { const [y,m,d] = iso.split("-"); return `${d}/${m}/${y}`; } catch { return iso; } };
+
+  // ── Gestión de productos extras ──
+  const [sel, setSel] = useState(0);
+  const [showNew, setShowNew] = useState(false);
+  const [nf, setNf] = useState({ nombre: "", categoria: "Bebidas", precio_venta: "", costo_unit: "" });
+
+  const extra = extras[sel];
+  const updE = (f, v) => setExtras(extras.map((e, i) => i !== sel ? e : { ...e, [f]: ["precio_venta","costo_unit"].includes(f) ? Number(v) : v }));
+  const addE = () => {
+    if (!nf.nombre) return;
+    setExtras([...extras, { id: Date.now(), nombre: nf.nombre, categoria: nf.categoria, precio_venta: Number(nf.precio_venta) || 0, costo_unit: Number(nf.costo_unit) || 0 }]);
+    setSel(extras.length); setShowNew(false); setNf({ nombre: "", categoria: "Bebidas", precio_venta: "", costo_unit: "" });
+  };
+  const delE = (i) => { if (extras.length <= 1) return; setExtras(extras.filter((_, ii) => ii !== i)); setSel(Math.max(0, i - 1)); };
+
+  // ── Registro de ventas de extras ──
+  const [fecha, setFecha] = useState(todayISO);
+  const [extraId, setExtraId] = useState("");
+  const [cantidad, setCantidad] = useState("1");
+
+  const selExtra = extras.find(e => e.id === Number(extraId));
+  const addVenta = () => {
+    if (!extraId || !cantidad || Number(cantidad) <= 0) return;
+    setVentasExtras([...ventasExtras, { id: Date.now(), fecha: fmtFecha(fecha), extra_id: Number(extraId), extra_nombre: selExtra?.nombre || "", cantidad: Number(cantidad), precio_unit: selExtra?.precio_venta || 0, costo_unit: selExtra?.costo_unit || 0 }]);
+    setCantidad("1");
+  };
+
+  const totalIngresos = ventasExtras.reduce((s, v) => s + v.precio_unit * v.cantidad, 0);
+  const totalUnidades = ventasExtras.reduce((s, v) => s + v.cantidad, 0);
+  const totalCosto    = ventasExtras.reduce((s, v) => s + v.costo_unit * v.cantidad, 0);
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+      {/* Stats */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "9px" }}>
+        <StatBox label="Ingresos extras" value={fmt(totalIngresos)} accent />
+        <StatBox label="Unidades vendidas" value={totalUnidades} />
+        <StatBox label="Margen bruto extras" value={fmt(totalIngresos - totalCosto)} accent={totalIngresos > totalCosto} />
+      </div>
+
+      <div style={{ display: "flex", gap: "14px" }}>
+        {/* ── Lista de productos ── */}
+        <div style={{ width: "190px", flexShrink: 0 }}>
+          <div style={{ color: "#222", fontSize: "10px", fontFamily: mono, textTransform: "uppercase", marginBottom: "7px", letterSpacing: "0.1em" }}>Productos</div>
+          {extras.map((e, i) => (
+            <div key={e.id} style={{ display: "flex", gap: "4px", marginBottom: "4px" }}>
+              <button onClick={() => setSel(i)} style={{ flex: 1, background: sel === i ? "#1a7a3a" : "#d4edd9", color: sel === i ? "#d4edd9" : "#aaa", border: `1px solid ${sel === i ? "#1a7a3a" : "#222"}`, borderRadius: "7px", padding: "8px 11px", textAlign: "left", cursor: "pointer", fontFamily: mono, fontSize: "11px", fontWeight: sel === i ? "700" : "400" }}>✦ {e.nombre}</button>
+              {extras.length > 1 && <X onClick={() => delE(i)} />}
+            </div>
+          ))}
+          {showNew ? (
+            <Card style={{ padding: "11px", marginTop: "5px" }}>
+              <input placeholder="Nombre" value={nf.nombre} onChange={e => setNf({ ...nf, nombre: e.target.value })} style={{ ...IS, width: "100%", marginBottom: "5px" }} />
+              <select value={nf.categoria} onChange={e => setNf({ ...nf, categoria: e.target.value })} style={{ ...IS, width: "100%", marginBottom: "5px" }}>{CATS_EXTRA.map(c => <option key={c}>{c}</option>)}</select>
+              <input type="number" placeholder="Precio venta $" value={nf.precio_venta} onChange={e => setNf({ ...nf, precio_venta: e.target.value })} style={{ ...IS, width: "100%", marginBottom: "5px" }} />
+              <input type="number" placeholder="Costo unitario $" value={nf.costo_unit} onChange={e => setNf({ ...nf, costo_unit: e.target.value })} style={{ ...IS, width: "100%", marginBottom: "7px" }} />
+              <div style={{ display: "flex", gap: "5px" }}><Btn onClick={addE} style={{ flex: 1 }}>Crear</Btn><Btn onClick={() => setShowNew(false)} variant="ghost" style={{ flex: 1 }}>✕</Btn></div>
+            </Card>
+          ) : (
+            <button onClick={() => setShowNew(true)} style={{ width: "100%", background: "transparent", color: "#222", border: "1px dashed #a0c0a0", borderRadius: "7px", padding: "8px", cursor: "pointer", fontFamily: mono, fontSize: "10px", marginTop: "4px" }}>+ Nuevo producto</button>
+          )}
+        </div>
+
+        {/* ── Editor del extra seleccionado ── */}
+        {extra && (
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "11px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "9px" }}>
+              <StatBox label="Precio de venta" value={fmt(extra.precio_venta)} />
+              <StatBox label="Costo unitario" value={fmt(extra.costo_unit)} />
+              <StatBox label="Margen unitario" value={fmt(extra.precio_venta - extra.costo_unit)} accent={extra.precio_venta > extra.costo_unit} />
+            </div>
+            <Card>
+              <H title="Datos del producto" />
+              <div style={{ display: "flex", gap: "9px", flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 120 }}>
+                  <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: mono, marginBottom: "4px" }}>NOMBRE</div>
+                  <input value={extra.nombre} onChange={e => updE("nombre", e.target.value)} style={{ ...IS, width: "100%" }} />
+                </div>
+                <div style={{ width: 130 }}>
+                  <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: mono, marginBottom: "4px" }}>CATEGORÍA</div>
+                  <select value={extra.categoria} onChange={e => updE("categoria", e.target.value)} style={{ ...IS, width: "100%" }}>{CATS_EXTRA.map(c => <option key={c}>{c}</option>)}</select>
+                </div>
+                <div style={{ width: 130 }}>
+                  <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: mono, marginBottom: "4px" }}>PRECIO VENTA $</div>
+                  <input type="number" value={extra.precio_venta} onChange={e => updE("precio_venta", e.target.value)} style={{ ...IS, width: "100%", color: "#1a7a3a", fontWeight: "700" }} />
+                </div>
+                <div style={{ width: 130 }}>
+                  <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: mono, marginBottom: "4px" }}>COSTO UNITARIO $</div>
+                  <input type="number" value={extra.costo_unit} onChange={e => updE("costo_unit", e.target.value)} style={{ ...IS, width: "100%" }} />
+                </div>
+              </div>
+            </Card>
+
+            {/* ── Registrar venta de extra ── */}
+            <Card>
+              <H title="Registrar venta de extra" />
+              <div style={{ display: "grid", gridTemplateColumns: "140px 1fr 80px auto", gap: "8px", alignItems: "end" }}>
+                <div>
+                  <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: mono, marginBottom: "4px" }}>FECHA</div>
+                  <input type="date" value={fecha} onChange={e => setFecha(e.target.value)} style={{ ...IS, width: "100%" }} />
+                </div>
+                <div>
+                  <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: mono, marginBottom: "4px" }}>PRODUCTO</div>
+                  <select value={extraId} onChange={e => setExtraId(e.target.value)} style={{ ...IS, width: "100%" }}>
+                    <option value="">Seleccionar...</option>
+                    {extras.map(e => <option key={e.id} value={e.id}>{e.nombre} — {fmt(e.precio_venta)}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <div style={{ color: "#5a8a6e", fontSize: "9px", fontFamily: mono, marginBottom: "4px" }}>CANTIDAD</div>
+                  <input type="number" min="1" value={cantidad} onChange={e => setCantidad(e.target.value)} style={{ ...IS, width: "100%" }} />
+                </div>
+                <Btn onClick={addVenta}>+ Agregar</Btn>
+              </div>
+            </Card>
+
+            {/* ── Tabla ventas extras ── */}
+            <Card>
+              <H title="Ventas de extras">
+                {ventasExtras.length > 0 && <Btn variant="ghost" onClick={() => { if (window.confirm("¿Borrar todas las ventas de extras?")) setVentasExtras([]); }}>Limpiar</Btn>}
+              </H>
+              {ventasExtras.length > 0 ? (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse", fontFamily: mono, fontSize: "12px" }}>
+                    <thead>
+                      <tr style={{ borderBottom: "2px solid #c8e6d0" }}>
+                        {["Fecha","Producto","Cant","Precio unit","Subtotal",""].map(h => (
+                          <th key={h} style={{ padding: "7px 10px", color: "#5a8a6e", fontSize: "9px", textAlign: h==="Cant"||h==="Precio unit"||h==="Subtotal" ? "right" : "left", textTransform: "uppercase", fontWeight: "700" }}>{h}</th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {ventasExtras.map((v, i) => (
+                        <tr key={v.id} style={{ borderBottom: "1px solid #e8f5ec", background: i % 2 === 0 ? "#fafffe" : "#fff" }}>
+                          <td style={{ padding: "8px 10px", color: "#5a8a6e", fontSize: "10px" }}>{v.fecha}</td>
+                          <td style={{ padding: "8px 10px", color: "#1a3a25" }}>{v.extra_nombre}</td>
+                          <td style={{ padding: "8px 10px", textAlign: "right", fontWeight: "700" }}>{v.cantidad}</td>
+                          <td style={{ padding: "8px 10px", textAlign: "right", color: "#5a8a6e" }}>{fmt(v.precio_unit)}</td>
+                          <td style={{ padding: "8px 10px", textAlign: "right", color: "#1a7a3a", fontWeight: "700" }}>{fmt(v.precio_unit * v.cantidad)}</td>
+                          <td style={{ padding: "8px 4px" }}><X onClick={() => setVentasExtras(ventasExtras.filter(x => x.id !== v.id))} /></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot>
+                      <tr style={{ borderTop: "2px solid #c8e6d0" }}>
+                        <td colSpan={2} style={{ padding: "9px 10px", fontFamily: mono, fontSize: "11px", fontWeight: "700", color: "#5a8a6e" }}>TOTAL</td>
+                        <td style={{ padding: "9px 10px", textAlign: "right", fontWeight: "700" }}>{totalUnidades}</td>
+                        <td />
+                        <td style={{ padding: "9px 10px", textAlign: "right", color: "#1a7a3a", fontWeight: "700", fontSize: "14px" }}>{fmt(totalIngresos)}</td>
+                        <td />
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+              ) : (
+                <div style={{ textAlign: "center", padding: "28px", color: "#8aba9e", fontFamily: mono, fontSize: "11px" }}>No hay ventas de extras registradas.</div>
+              )}
+            </Card>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // ===================== VENTAS =====================
-function VentasTab({ ventas, setVentas, burgers, insumos, salsas }) {
+function VentasTab({ ventas, setVentas, burgers, insumos, salsas, ventasExtras }) {
   const todayISO = new Date().toISOString().split("T")[0];
   const [fecha, setFecha] = useState(todayISO);
   const [burgerId, setBurgerId] = useState("");
@@ -1273,6 +1445,7 @@ function VentasTab({ ventas, setVentas, burgers, insumos, salsas }) {
 
   const totalVentas = ventas.reduce((s, v) => s + v.precio_unit * v.cantidad, 0);
   const totalUnidades = ventas.reduce((s, v) => s + v.cantidad, 0);
+  const totalExtras = (ventasExtras || []).reduce((s, v) => s + v.precio_unit * v.cantidad, 0);
 
   const exportCSV = () => {
     const rows = [["Fecha","Hamburguesa","Cantidad","Precio unit","Subtotal","Empleado"],...ventas.map(v=>[v.fecha,`"${v.burger_nombre}"`,v.cantidad,v.precio_unit,v.precio_unit*v.cantidad,v.empleado||""])].map(r=>r.join(",")).join("\n");
@@ -1282,10 +1455,11 @@ function VentasTab({ ventas, setVentas, burgers, insumos, salsas }) {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "9px" }}>
-        <StatBox label="Total ventas" value={fmt(totalVentas)} accent />
-        <StatBox label="Unidades vendidas" value={totalUnidades} accent={totalUnidades > 0} />
-        <StatBox label="Registros" value={ventas.length} />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "9px" }}>
+        <StatBox label="Total hamburguesas" value={fmt(totalVentas)} accent />
+        <StatBox label="Total extras" value={fmt(totalExtras)} accent={totalExtras > 0} />
+        <StatBox label="Total combinado" value={fmt(totalVentas + totalExtras)} accent />
+        <StatBox label="Unidades hamburgesas" value={totalUnidades} />
       </div>
 
       <Card>
@@ -2183,6 +2357,8 @@ const KEYS = {
   ventasReg: "hb-ventas-reg",
   usuarios: "hb-users",
   produccion: "hb-produccion",
+  extras: "hb-extras",
+  ventasExtras: "hb-ventas-extras",
 };
 
 function exportarDatos() {
@@ -2222,7 +2398,7 @@ function importarDatos(archivo, onDone) {
 }
 
 // ===================== REPORTES =====================
-function ReportesTab({ ventasReg, cajaDiaria, costosFijos, burgers, insumos, salsas, ingresosStock }) {
+function ReportesTab({ ventasReg, cajaDiaria, costosFijos, burgers, insumos, salsas, ingresosStock, ventasExtras }) {
   const [subTab, setSubTab] = useState(0);
   const [cmvDesde, setCmvDesde] = useState("");
   const [cmvHasta, setCmvHasta] = useState("");
@@ -2245,8 +2421,10 @@ function ReportesTab({ ventasReg, cajaDiaria, costosFijos, burgers, insumos, sal
   });
 
   const totalRevenue = ventasC.reduce((s,v) => s + v.revenue, 0);
+  const totalRevenueExtras = (ventasExtras||[]).reduce((s,v) => s + (v.precio_unit||0)*(v.cantidad||0), 0);
+  const totalCostoExtras   = (ventasExtras||[]).reduce((s,v) => s + (v.costo_unit||0)*(v.cantidad||0), 0);
   const totalCMVteo = ventasC.reduce((s,v) => s + v.costo, 0);
-  const totalMargen = totalRevenue - totalCMVteo;
+  const totalMargen = (totalRevenue + totalRevenueExtras) - (totalCMVteo + totalCostoExtras);
   const totalUnidades = ventas.reduce((s,v) => s + (v.cantidad||0), 0);
   const diasConVentas = new Set(ventas.map(v => v.fecha)).size;
 
@@ -2911,6 +3089,8 @@ export default function App() {
   const [usuarios, setUsuarios, r14] = usePersisted(KEYS.usuarios, []);
   const [ingresosStock, setIngresosStock, r15] = usePersisted(KEYS.ingresosStock, []);
   const [produccion, setProduccion, r16] = usePersisted(KEYS.produccion, []);
+  const [extras, setExtras, r17] = usePersisted(KEYS.extras, []);
+  const [ventasExtras, setVentasExtras, r18] = usePersisted(KEYS.ventasExtras, []);
 
   useEffect(() => {
     if (!r2 || !burgers) return;
@@ -2932,7 +3112,7 @@ export default function App() {
   if (!currentUser) return <LoginScreen onLogin={u => setCurrentUser(u)} />;
   const mesKey = `${new Date().getFullYear()}-${new Date().getMonth()}`;
 
-  if (![r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,r15,r16,rp0,rp1].every(Boolean)) return (
+  if (![r0,r1,r2,r3,r4,r5,r6,r7,r8,r9,r10,r11,r12,r13,r14,r15,r16,r17,r18,rp0,rp1].every(Boolean)) return (
     <div style={{ minHeight: "100vh", background: "#f0f7f2", display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "12px" }}>
       <style>{`@import url('https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;700&display=swap');`}</style>
       <div style={{ fontSize: "28px" }}>🍔</div>
@@ -2946,6 +3126,7 @@ export default function App() {
     { label: "Recetas", icon: "🧪" },
     { label: "Producción", icon: "🥘" },
     { label: "Hamburguesas", icon: "🍔" },
+    { label: "Extras", icon: "✦" },
     { label: "Equilibrio", icon: "⚖️" },
     { label: "Costos fijos", icon: "📋" },
     { label: "Proveedores", icon: "🏭" },
@@ -3041,20 +3222,21 @@ export default function App() {
           </span>
         </div>
         <div style={{ padding: "20px 24px" }}>
-          {tab === 0 && <DashboardTab cajaDiaria={cajaDiaria||[]} ventasReg={ventasReg} burgers={burgers} />}
-          {tab === 1 && <InsumosTab insumos={insumos} setInsumos={setInsumos} />}
-          {tab === 2 && <SalsasTab salsas={salsas} setSalsas={setSalsas} insumos={insumos} />}
-          {tab === 3 && <ProduccionTab salsas={salsas} insumos={insumos} produccion={produccion || []} setProduccion={setProduccion} ventas={ventasReg} burgers={burgers} />}
-          {tab === 4 && <BurgersTab burgers={burgers} setBurgers={setBurgers} insumos={insumos} salsas={salsas} />}
-          {tab === 5 && <PuntoEquilibrioTab burgers={burgers} costosFijos={costosFijos} insumos={insumos} salsas={salsas} ventas={ventasReg} />}
-          {tab === 6 && <CostosFijosTab costosFijos={costosFijos} setCostosFijos={setCostosFijos} pagos={pagos} setPagos={setPagos} mesKey={mesKey} />}
-          {tab === 7 && <ProveedoresTab proveedores={proveedores || []} setProveedores={setProveedores} pagosP={pagosP} setPagosP={setPagosP} mesKey={mesKey} />}
-          {tab === 8 && <VentasTab ventas={ventasReg} setVentas={setVentasReg} burgers={burgers} insumos={insumos} salsas={salsas} />}
-          {tab === 9 && <StockTab insumos={insumos} ventas={ventasReg} burgers={burgers} salsas={salsas} stockInicial={stockInicial} setStockInicial={setStockInicial} ingresosStock={ingresosStock || []} setIngresosStock={setIngresosStock} produccion={produccion || []} />}
-          {tab === 10 && <CajaDiariaTab cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} presets={cajaPresets || []} setPresets={setCajaPresets} />}
-          {tab === 11 && <CajaBancoTab costosFijos={costosFijos} pagos={pagos} proveedores={proveedores || []} pagosP={pagosP} mesKey={mesKey} cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} banco={banco} setBanco={setBanco} pedidosPendientes={pedidos} setPedidosPendientes={setPedidos} ventasDiarias={ventasDiarias} setVentasDiarias={setVentasDiarias} registros={registros || []} setRegistros={setRegistros} />}
-          {tab === 12 && <ReportesTab ventasReg={ventasReg} cajaDiaria={cajaDiaria||[]} costosFijos={costosFijos} burgers={burgers} insumos={insumos} salsas={salsas} ingresosStock={ingresosStock||[]} />}
-          {tab === 13 && currentUser?.isAdmin && <UsuariosTab usuarios={usuarios} setUsuarios={setUsuarios} />}
+          {tab === 0  && <DashboardTab cajaDiaria={cajaDiaria||[]} ventasReg={ventasReg} burgers={burgers} />}
+          {tab === 1  && <InsumosTab insumos={insumos} setInsumos={setInsumos} />}
+          {tab === 2  && <SalsasTab salsas={salsas} setSalsas={setSalsas} insumos={insumos} />}
+          {tab === 3  && <ProduccionTab salsas={salsas} insumos={insumos} produccion={produccion || []} setProduccion={setProduccion} ventas={ventasReg} burgers={burgers} />}
+          {tab === 4  && <BurgersTab burgers={burgers} setBurgers={setBurgers} insumos={insumos} salsas={salsas} />}
+          {tab === 5  && <ExtrasTab extras={extras || []} setExtras={setExtras} ventasExtras={ventasExtras || []} setVentasExtras={setVentasExtras} />}
+          {tab === 6  && <PuntoEquilibrioTab burgers={burgers} costosFijos={costosFijos} insumos={insumos} salsas={salsas} ventas={ventasReg} />}
+          {tab === 7  && <CostosFijosTab costosFijos={costosFijos} setCostosFijos={setCostosFijos} pagos={pagos} setPagos={setPagos} mesKey={mesKey} />}
+          {tab === 8  && <ProveedoresTab proveedores={proveedores || []} setProveedores={setProveedores} pagosP={pagosP} setPagosP={setPagosP} mesKey={mesKey} />}
+          {tab === 9  && <VentasTab ventas={ventasReg} setVentas={setVentasReg} burgers={burgers} insumos={insumos} salsas={salsas} ventasExtras={ventasExtras || []} />}
+          {tab === 10 && <StockTab insumos={insumos} ventas={ventasReg} burgers={burgers} salsas={salsas} stockInicial={stockInicial} setStockInicial={setStockInicial} ingresosStock={ingresosStock || []} setIngresosStock={setIngresosStock} produccion={produccion || []} />}
+          {tab === 11 && <CajaDiariaTab cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} presets={cajaPresets || []} setPresets={setCajaPresets} />}
+          {tab === 12 && <CajaBancoTab costosFijos={costosFijos} pagos={pagos} proveedores={proveedores || []} pagosP={pagosP} mesKey={mesKey} cajaDiaria={cajaDiaria || []} setCajaDiaria={setCajaDiaria} banco={banco} setBanco={setBanco} pedidosPendientes={pedidos} setPedidosPendientes={setPedidos} ventasDiarias={ventasDiarias} setVentasDiarias={setVentasDiarias} registros={registros || []} setRegistros={setRegistros} />}
+          {tab === 13 && <ReportesTab ventasReg={ventasReg} cajaDiaria={cajaDiaria||[]} costosFijos={costosFijos} burgers={burgers} insumos={insumos} salsas={salsas} ingresosStock={ingresosStock||[]} ventasExtras={ventasExtras||[]} />}
+          {tab === 14 && currentUser?.isAdmin && <UsuariosTab usuarios={usuarios} setUsuarios={setUsuarios} />}
         </div>
       </div>
     </div>
