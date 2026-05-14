@@ -269,14 +269,18 @@ function calcCostoSalsa(salsa, insumos) {
     const ins = insumos.find(i => i.id === ing.insumo_id);
     return s + (ins ? ins.precio_unidad * ing.cantidad : 0);
   }, 0);
-  // costo por KG de salsa terminada
+  if (salsa.rendTipo === "unidad") {
+    // costo por UNIDAD de receta terminada
+    return costoTotal / (salsa.rendCantidad || 1);
+  }
+  // costo por KG de salsa terminada (comportamiento original)
   const pesoKg = calcPesoTotalSalsa(salsa);
   return pesoKg > 0 ? costoTotal / pesoKg : 0;
 }
 
-// Calcula costo de una cantidad (en kg) de salsa
-function calcCostoSalsaKg(salsa, insumos, cantidadKg) {
-  return calcCostoSalsa(salsa, insumos) * cantidadKg;
+// Calcula costo de usar X unidades o kg de una receta (según su rendTipo)
+function calcCostoSalsaKg(salsa, insumos, cantidad) {
+  return calcCostoSalsa(salsa, insumos) * cantidad;
 }
 
 function calcCostoIngBurger(ing, insumos, salsas) {
@@ -305,10 +309,18 @@ function calcConsumoVenta(burger, cantidadVendida, salsas) {
     } else if (ing.tipo === "salsa") {
       const salsa = salsas.find(s => s.id === ing.ref_id);
       if (salsa) {
-        const pesoTotal = calcPesoTotalSalsa(salsa);
-        for (const sIng of salsa.ingredientes) {
-          const cant = pesoTotal > 0 ? (sIng.cantidad / pesoTotal) * cantEfectiva : 0;
-          consumo[sIng.insumo_id] = (consumo[sIng.insumo_id] || 0) + cant;
+        if (salsa.rendTipo === "unidad") {
+          const rendCant = salsa.rendCantidad || 1;
+          for (const sIng of salsa.ingredientes) {
+            const kgPorUnidad = sIng.cantidad / rendCant;
+            consumo[sIng.insumo_id] = (consumo[sIng.insumo_id] || 0) + kgPorUnidad * cantEfectiva;
+          }
+        } else {
+          const pesoTotal = calcPesoTotalSalsa(salsa);
+          for (const sIng of salsa.ingredientes) {
+            const cant = pesoTotal > 0 ? (sIng.cantidad / pesoTotal) * cantEfectiva : 0;
+            consumo[sIng.insumo_id] = (consumo[sIng.insumo_id] || 0) + cant;
+          }
         }
       }
     }
@@ -417,13 +429,14 @@ function SalsasTab({ salsas, setSalsas, insumos }) {
   const [ni, setNi] = useState({ insumo_id: insumos[0]?.id || "", cantidad: "" });
 
   const salsa = salsas[sel];
+  const esPorUnidad = salsa?.rendTipo === "unidad";
   const costoReceta = salsa ? salsa.ingredientes.reduce((s, ing) => { const ins = insumos.find(i => i.id === ing.insumo_id); return s + (ins ? ins.precio_unidad * ing.cantidad : 0); }, 0) : 0;
   const pesoTotalKg = salsa ? calcPesoTotalSalsa(salsa) : 0;
   const pesoTotalGr = pesoTotalKg * 1000;
-  const costoPorKg = salsa ? calcCostoSalsa(salsa, insumos) : 0;
-  const costoPorGr = costoPorKg / 1000;
+  const costoPorBase = salsa ? calcCostoSalsa(salsa, insumos) : 0; // $/kg o $/unidad según rendTipo
+  const costoPorGr = !esPorUnidad ? costoPorBase / 1000 : 0;
 
-  const addS = () => { if (!nf.nombre) return; setSalsas([...salsas, { id: Date.now(), nombre: nf.nombre, ingredientes: [] }]); setSel(salsas.length); setShowNew(false); setNf({ nombre: "" }); };
+  const addS = () => { if (!nf.nombre) return; setSalsas([...salsas, { id: Date.now(), nombre: nf.nombre, rendTipo: "peso", rendCantidad: 1, ingredientes: [] }]); setSel(salsas.length); setShowNew(false); setNf({ nombre: "" }); };
   const delS = (i) => { if (salsas.length <= 1) return; setSalsas(salsas.filter((_, ii) => ii !== i)); setSel(Math.max(0, i - 1)); };
   const updS = (f, v) => setSalsas(salsas.map((s, i) => i !== sel ? s : { ...s, [f]: v }));
   const addI = () => { if (!ni.insumo_id || !ni.cantidad) return; setSalsas(salsas.map((s, i) => i !== sel ? s : { ...s, ingredientes: [...s.ingredientes, { insumo_id: Number(ni.insumo_id), cantidad: Number(ni.cantidad) }] })); setNi({ insumo_id: insumos[0]?.id || "", cantidad: "" }); };
@@ -455,14 +468,36 @@ function SalsasTab({ salsas, setSalsas, insumos }) {
         <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "11px" }}>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "9px" }}>
             <StatBox label="Costo total receta" value={fmt(costoReceta)} />
-            <StatBox label="Peso total" value={`${Math.round(pesoTotalGr)} gr`} />
-            <StatBox label="Costo por kg" value={fmt(costoPorKg)} />
-            <StatBox label="Costo por gr" value={`$${costoPorGr.toFixed(2)}`} accent />
+            {esPorUnidad
+              ? <StatBox label="Rinde (unidades)" value={salsa.rendCantidad || 1} />
+              : <StatBox label="Peso total" value={`${Math.round(pesoTotalGr)} gr`} />}
+            {esPorUnidad
+              ? <StatBox label="Costo por unidad" value={fmt(costoPorBase)} accent />
+              : <StatBox label="Costo por kg" value={fmt(costoPorBase)} />}
+            {esPorUnidad
+              ? <StatBox label="Tipo" value="Por unidad" accent />
+              : <StatBox label="Costo por gr" value={`$${costoPorGr.toFixed(2)}`} accent />}
           </div>
           <Card>
-            <div style={{ display: "flex", gap: "11px" }}>
-              <div style={{ flex: 1 }}><div style={{ color: "#5a8a6e", fontSize: "10px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>NOMBRE</div><input value={salsa.nombre} onChange={e => updS("nombre", e.target.value)} style={{ ...IS, width: "100%" }} /></div>
-              <div style={{ width: "200px" }}><div style={{ color: "#5a8a6e", fontSize: "10px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>PESO TOTAL: {Math.round(pesoTotalGr)}gr — ${costoPorGr.toFixed(2)}/gr</div><div style={{ ...IS, width: "100%", color: "#1a7a3a", fontWeight: "700", padding: "7px 9px" }}>{fmt(costoPorKg)} por kg</div></div>
+            <div style={{ display: "flex", gap: "11px", flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: 120 }}><div style={{ color: "#5a8a6e", fontSize: "10px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>NOMBRE</div><input value={salsa.nombre} onChange={e => updS("nombre", e.target.value)} style={{ ...IS, width: "100%" }} /></div>
+              <div style={{ width: 160 }}>
+                <div style={{ color: "#5a8a6e", fontSize: "10px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>TIPO DE RENDIMIENTO</div>
+                <div style={{ display: "flex", gap: "5px" }}>
+                  {["peso", "unidad"].map(t => (
+                    <button key={t} onClick={() => updS("rendTipo", t)} style={{ flex: 1, padding: "7px 6px", borderRadius: "6px", border: "none", background: (salsa.rendTipo || "peso") === t ? "#2e7d32" : "#e8f5e9", color: (salsa.rendTipo || "peso") === t ? "#fff" : "#2e7d32", fontFamily: "'DM Mono', monospace", fontSize: "10px", fontWeight: "700", cursor: "pointer", textTransform: "uppercase" }}>{t}</button>
+                  ))}
+                </div>
+              </div>
+              {esPorUnidad && (
+                <div style={{ width: 130 }}>
+                  <div style={{ color: "#5a8a6e", fontSize: "10px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>RINDE (unidades)</div>
+                  <input type="number" min="1" value={salsa.rendCantidad || 1} onChange={e => updS("rendCantidad", Number(e.target.value))} style={{ ...IS, width: "100%" }} />
+                </div>
+              )}
+              {!esPorUnidad && (
+                <div style={{ width: 200 }}><div style={{ color: "#5a8a6e", fontSize: "10px", fontFamily: "'DM Mono', monospace", marginBottom: "4px" }}>PESO TOTAL: {Math.round(pesoTotalGr)}gr — ${costoPorGr.toFixed(2)}/gr</div><div style={{ ...IS, width: "100%", color: "#1a7a3a", fontWeight: "700", padding: "7px 9px" }}>{fmt(costoPorBase)} por kg</div></div>
+              )}
             </div>
           </Card>
           <Card>
@@ -713,7 +748,11 @@ function BurgersTab({ burgers, setBurgers, insumos, salsas }) {
   const updB = (f, v) => setBurgers(burgers.map((b, i) => i !== sel ? b : { ...b, [f]: f === "precio_venta" ? Number(v) : v }));
   const refs = () => ni.tipo === "insumo" ? insumos : salsas;
   const refNombre = (tipo, id) => (tipo === "insumo" ? insumos : salsas).find(x => x.id === Number(id))?.nombre || "?";
-  const refUnidad = (tipo, id) => tipo === "insumo" ? (insumos.find(x => x.id === Number(id))?.unidad || "") : "porcion";
+  const refUnidad = (tipo, id) => {
+    if (tipo === "insumo") return insumos.find(x => x.id === Number(id))?.unidad || "";
+    const s = salsas.find(x => x.id === Number(id));
+    return s?.rendTipo === "unidad" ? "unidad" : "kg";
+  };
   const addI = () => {
     if (!ni.ref_id || !ni.cantidad) return;
     const rid = Number(ni.ref_id);
