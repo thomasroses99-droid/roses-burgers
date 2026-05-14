@@ -686,6 +686,57 @@ function ProduccionTab({ salsas, insumos, produccion, setProduccion, ventas, bur
 }
 
 // ===================== HAMBURGUESAS =====================
+const SUFIJOS = ["- Simple", "- Doble", "- Triple", "- Simple con papas", "- Doble con papas", "- Triple con papas"];
+const SUFIJOS_LABEL = ["Simple", "Doble", "Triple", "Simple con papas", "Doble con papas", "Triple con papas"];
+
+function PreciosVentaCard({ burgers, setBurgers }) {
+  const mono = "'DM Mono', monospace";
+  const [show, setShow] = useState(false);
+
+  const [precios, setPrecios] = useState(() =>
+    SUFIJOS.map(sf => {
+      const b = burgers.find(x => x.nombre.endsWith(sf));
+      return b?.precio_venta ?? 0;
+    })
+  );
+
+  function aplicarPrecios() {
+    setBurgers(prev => prev.map(b => {
+      const idx = SUFIJOS.findIndex(sf => b.nombre.endsWith(sf));
+      return idx >= 0 ? { ...b, precio_venta: precios[idx] } : b;
+    }));
+  }
+
+  return (
+    <Card style={{ padding: "14px 16px" }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: show ? "14px" : 0 }}>
+        <span style={{ fontSize: "11px", fontFamily: mono, textTransform: "uppercase", letterSpacing: "0.1em", color: "#1a5c2a", fontWeight: 700 }}>Precios de Venta</span>
+        <button onClick={() => setShow(s => !s)} style={{ background: "none", border: "none", color: "#5a8a6e", cursor: "pointer", fontFamily: mono, fontSize: "10px" }}>{show ? "▲ ocultar" : "▼ mostrar"}</button>
+      </div>
+      {show && (
+        <>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px", marginBottom: "10px" }}>
+            {SUFIJOS.map((sf, i) => (
+              <div key={sf}>
+                <div style={{ fontSize: "9px", fontFamily: mono, textTransform: "uppercase", color: "#1a5c2a", marginBottom: "4px" }}>{SUFIJOS_LABEL[i]}</div>
+                <input
+                  type="number"
+                  value={precios[i]}
+                  onChange={e => setPrecios(prev => prev.map((v, ii) => ii === i ? Number(e.target.value) : v))}
+                  style={{ ...IS, width: "100%", fontWeight: 700, color: "#1a7a3a" }}
+                />
+              </div>
+            ))}
+          </div>
+          <Btn onClick={aplicarPrecios} style={{ width: "100%" }}>
+            Aplicar a TODAS las hamburguesas
+          </Btn>
+        </>
+      )}
+    </Card>
+  );
+}
+
 function BurgersTab({ burgers, setBurgers, insumos, salsas }) {
   const mono = "'DM Mono', monospace";
   const [sel, setSel] = useState(0);
@@ -832,6 +883,9 @@ function BurgersTab({ burgers, setBurgers, insumos, salsas }) {
           </>
         )}
       </Card>
+
+      {/* ── Precios de venta ── */}
+      <PreciosVentaCard burgers={burgers} setBurgers={setBurgers} />
 
       {/* ── Editor de hamburguesas ── */}
       <div style={{ display: "flex", gap: "14px" }}>
